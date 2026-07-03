@@ -1,0 +1,59 @@
+{
+  "name": "com.suvitruf.box3d",
+  "version": "0.1.0",
+  "displayName": "Box3d for Unity",
+  "description": "Unity bindings for Box3d, Erin Catto's 3D physics engine. Full C API coverage via P/Invoke: rigid bodies, six shape types, nine joint types, queries, contact/sensor events, a character mover toolkit and debug drawing — with deterministic simulation and strong multithreaded performance.",
+  "unity": "6000.0",
+  "license": "MIT",
+  "author": {
+    "name": "Suvitruf",
+    "url": "https://github.com/Suvitruf"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Suvitruf/box3d-unity.git"
+  },
+  "documentationUrl": "https://github.com/Suvitruf/box3d-unity/tree/main/Documentation~",
+  "dependencies": {
+    "com.unity.mathematics": "1.3.2"
+  },
+  "keywords": [
+    "physics",
+    "box3d",
+    "native",
+    "rigidbody",
+    "simulation"
+  ],
+  "samples": [
+    {
+      "displayName": "Basic Simulation",
+      "description": "Spheres raining onto a ground hull: world creation, stepping, transform sync via body move events.",
+      "path": "Samples~/BasicSimulation"
+    },
+    {
+      "displayName": "Joints",
+      "description": "A swinging chain of spherical joints with a ball on a distance-joint rope. Includes a debug-draw toggle.",
+      "path": "Samples~/Joints"
+    },
+    {
+      "displayName": "Mouse Drag",
+      "description": "Click-drag bodies with a motor joint (box3d's mouse joint). Requires the Input System package.",
+      "path": "Samples~/MouseDrag"
+    },
+    {
+      "displayName": "Character Mover",
+      "description": "Kinematic capsule character (WASD + jump) built on the collide/solve/clip mover toolkit. Requires the Input System package.",
+      "path": "Samples~/CharacterMover"
+    },
+    {
+      "displayName": "Vehicle",
+      "description": "Drivable car on wheel joints over mesh terrain, ported from box3d's Driving sample. Requires the Input System package.",
+      "path": "Samples~/Vehicle"
+    },
+    {
+      "displayName": "Benchmarks vs PhysX",
+      "description": "Side-by-side performance scenes (sphere rain, joint-grid cloth, island workloads) comparing Box3d and Unity's built-in PhysX, with CSV metric export.",
+      "path": "Samples~/Benchmarks"
+    }
+  ]
+}

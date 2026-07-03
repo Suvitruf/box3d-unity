@@ -1,0 +1,16 @@
+box3d pinned build
+==================
+version:  0.1.0
+commit:   29bf523 (v0.1.0-2-g29bf523, "Fixes 02 (#31)")
+source:   /mnt/e/Projects/box3d (E:\Projects\box3d)
+config:   Release, BUILD_SHARED_LIBS=ON (static for iOS), single precision
+
+Shipped binaries (all built from the commit above):
+- Windows x64   box3d.dll        build_windows.bat (VS 2022 BuildTools)     built 2026-07-02
+- Linux x64     libbox3d.so      build_linux.sh (WSL gcc 13)                built 2026-07-03
+- Android arm64 libbox3d.so      build_android.bat (Unity NDK r27.2, API 23, stripped)  built 2026-07-03
+- macOS universal libbox3d.dylib build_macos.sh — NOT BUILT YET (needs a Mac)
+- iOS arm64     libbox3d.a       build_ios.sh — NOT BUILT YET (needs a Mac; C# side ready via
+                                 Box3dLibrary.Name = "__Internal" on iOS)
+
+On version bumps: update this file, rebuild ALL platforms, regenerate bindings, run struct-size tests.

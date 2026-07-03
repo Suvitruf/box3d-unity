@@ -1,0 +1,3 @@
+# Native build output (build/, build-linux/, build-android/, build-macos/, build-ios/).
+# Never commit these — they contain WSL symlinks Windows git cannot even index.
+build*/
