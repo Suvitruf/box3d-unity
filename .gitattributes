@@ -1,0 +1,13 @@
+# Line endings: keep scripts runnable regardless of who checks out where.
+* text=auto
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binaries
+*.dll binary
+*.so binary
+*.dylib binary
+*.a binary
+*.gif binary
+*.png binary
+*.jpg binary
