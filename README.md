@@ -16,7 +16,7 @@ This project was inspired by, and owes its architecture to, two projects:
 - **[JoltPhysicsUnity](https://github.com/seep/JoltPhysicsUnity)** inspired the way this wrapper is implemented. Its binding-generation pipeline and packaging decisions shaped
   mine (what I deliberately did differently, is covered in the docs).
 
-> **Status: early (0.1.x).** Box3d itself is a young engine (v0.1) with no API stability
+> **Status: early (0.2.x).** Box3d itself is a young engine (v0.1) with no API stability
 > guarantees yet, and this wrapper tracks it. It is usable and well-tested, but expect breaking
 > changes on engine updates.
 

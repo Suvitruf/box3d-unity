@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1] — 2026-07-04
+
+### Added
+- Component layer: capsule, hull (convex, from a mesh), and mesh (static, from a mesh) shape
+  components, completing all five shape types.
+- Shapes honor the GameObject's Unity layer and the Layer Collision Matrix.
+
 ## [0.2.0] — 2026-07-04
 
 ### Added

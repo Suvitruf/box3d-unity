@@ -1,9 +1,9 @@
 # Component layer (experimental)
 
 > **Experimental (0.2.x).** A MonoBehaviour layer that lets you author physics in the Inspector
-> instead of writing C#, mirroring Unity's Rigidbody/Collider model. It covers bodies plus sphere
-> and box shapes today; capsules/hulls/meshes, compound (child) shapes, and joints are not wired up
-> yet. The pointer-level API in the rest of these docs remains the full-featured path. Lives in a
+> instead of writing C#, mirroring Unity's Rigidbody/Collider model. It covers bodies and all five
+> shape types (sphere, box, capsule, hull, mesh); compound (child) shapes and joints are not wired
+> up yet. The pointer-level API in the rest of these docs remains the full-featured path. Lives in a
 > separate `Box3d.Hybrid` assembly.
 
 If you know Unity's physics components, you already know these:
@@ -14,6 +14,9 @@ If you know Unity's physics components, you already know these:
 | `Box3dBody` | `Rigidbody` | A physics body: static / kinematic / dynamic. |
 | `Box3dSphereShape` | `SphereCollider` | A sphere shape on a body. |
 | `Box3dBoxShape` | `BoxCollider` | A box shape on a body. |
+| `Box3dCapsuleShape` | `CapsuleCollider` | A capsule shape (radius, height, axis). |
+| `Box3dHullShape` | convex `MeshCollider` | Convex hull from a mesh's vertices; works on dynamic bodies. |
+| `Box3dMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
 
 ## Quick start
 
@@ -75,10 +78,20 @@ Restitution notes that match the engine, not the component:
 `transform.lossyScale` is baked into shape dimensions at creation (spheres use the largest axis, as
 Unity does).
 
+### Collision layers
+
+Shapes honor the GameObject's **Layer** and Unity's **Layer Collision Matrix**
+(Project Settings → Physics): a shape's collision category is its layer, and it collides with the
+layers that layer is allowed to in the matrix. Set the layer as you would for a normal Unity
+collider. (The layer is read when the shape is created; changing it at runtime needs the body
+recreated.)
+
 ## Current limits
 
 - Shapes are read from the body's own GameObject only — child-collider compounds aren't gathered yet.
-- Sphere and box shapes only; a shape with no body does nothing (auto-static bodies are planned).
+- A shape with no body does nothing (auto-static bodies are planned).
+- Mesh shapes are static-only (use a hull shape for dynamic concave-ish objects). Hull and mesh
+  shapes read mesh vertices at runtime, so the mesh asset must have **Read/Write enabled**.
 - No joint components yet — use the code API for joints.
 
 For anything beyond this, drop to the code API ([getting started](getting-started.md)) — the
