@@ -16,5 +16,6 @@ First public release. Wraps Box3d v0.1.0 (commit 29bf523).
 - Debug-draw bridge (shapes, joints, contacts, islands → Scene view lines).
 - Explosions, wind, conveyor materials, per-axis motion locks, multithreading (worker count).
 - Native binaries: Windows x64, Linux x64, Android arm64-v8a. macOS/iOS build scripts included.
-- Samples: basic simulation, joints, mouse drag, character controller, vehicle, PhysX benchmarks.
+- Samples: interactive playground, basic simulation, joints, mouse drag, character controller,
+  vehicle, PhysX benchmarks.
 - 60+ edit-mode tests: ABI/layout guards, native-defaults round-trips, behavioral simulation tests.
