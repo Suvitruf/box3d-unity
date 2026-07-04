@@ -29,6 +29,18 @@ namespace Box3d
             if (_installed) return;
             _installed = true;
 
+            try
+            {
+                Box3dApi.GetVersion(); // probe: does the native library load on this platform?
+            }
+            catch (DllNotFoundException)
+            {
+                Debug.LogError("[Box3d] Native library not found for this platform. Shipped binaries: " +
+                               "Windows x64, Linux x64, Android arm64. macOS and iOS must be built from " +
+                               "source — see Documentation~/building-natives.md in the package.");
+                return;
+            }
+
             if (Box3dApi.IsDoublePrecision)
             {
                 Debug.LogError("[Box3d] Native library was built with BOX3D_DOUBLE_PRECISION — " +
