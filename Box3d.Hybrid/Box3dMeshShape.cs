@@ -45,7 +45,7 @@ namespace Box3d.Hybrid
             var points = new float3[vertices.Length];
             for (int i = 0; i < vertices.Length; i++)
             {
-                points[i] = vertices[i];
+                points[i] = (float3)vertices[i] + LocalCenter;
             }
 
             _mesh = TriangleMesh.Create(points, triangles);
@@ -55,6 +55,14 @@ namespace Box3d.Hybrid
         internal override void ReleaseGeometry()
         {
             if (_mesh.IsCreated) _mesh.Destroy();
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (!Mesh) return;
+            Gizmos.color = new Color(0.5f, 0.9f, 0.6f, 0.9f);
+            Gizmos.matrix = transform.localToWorldMatrix;
+            Gizmos.DrawWireMesh(Mesh, (Vector3)LocalCenter);
         }
     }
 }

@@ -40,13 +40,22 @@ namespace Box3d.Hybrid
             var points = new float3[vertices.Length];
             for (int i = 0; i < vertices.Length; i++)
             {
-                points[i] = (float3)vertices[i] * scale;
+                points[i] = ((float3)vertices[i] + LocalCenter) * scale;
             }
 
             Hull hull = Hull.Create(points, MaxVertices);
             Shape shape = body.CreateHullShape(BuildDef(), hull);
             hull.Destroy(); // cloned into the world — safe to free immediately
             return shape;
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            // Approximate: draws the source mesh, not the exact convex hull (close enough to place).
+            if (!Mesh) return;
+            Gizmos.color = new Color(0.5f, 0.9f, 0.6f, 0.9f);
+            Gizmos.matrix = transform.localToWorldMatrix;
+            Gizmos.DrawWireMesh(Mesh, (Vector3)LocalCenter);
         }
     }
 }

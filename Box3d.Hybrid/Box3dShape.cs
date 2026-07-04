@@ -78,6 +78,19 @@ namespace Box3d.Hybrid
         /// Default: nothing (spheres/boxes/hulls are self-contained or cloned).</summary>
         internal virtual void ReleaseGeometry() { }
 
+        // The color Unity uses for collider gizmos, so these read as familiar.
+        private static readonly Color GizmoColor = new Color(0.5f, 0.9f, 0.6f, 0.9f);
+
+        /// <summary>Sets the gizmo color and a position+rotation frame (no scale — subclasses bake
+        /// the lossy scale into their dimensions to match the physics shape exactly).</summary>
+        protected void SetGizmoFrame()
+        {
+            Gizmos.color = GizmoColor;
+            Gizmos.matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one);
+        }
+
+        protected float3 ScaledCenter => (float3)Center * (float3)transform.lossyScale;
+
 #if UNITY_EDITOR
         private void OnValidate()
         {

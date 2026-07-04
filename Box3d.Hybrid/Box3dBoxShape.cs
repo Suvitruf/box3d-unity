@@ -17,5 +17,12 @@ namespace Box3d.Hybrid
             BoxHull hull = BoxHull.CreateOffset(halfExtents.x, halfExtents.y, halfExtents.z, center);
             return body.CreateHullShape(BuildDef(), in hull);
         }
+
+        private void OnDrawGizmosSelected()
+        {
+            SetGizmoFrame();
+            float3 size = (float3)Size * math.abs((float3)transform.lossyScale);
+            Gizmos.DrawWireCube((Vector3)ScaledCenter, (Vector3)size);
+        }
     }
 }

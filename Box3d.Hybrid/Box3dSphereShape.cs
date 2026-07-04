@@ -16,5 +16,12 @@ namespace Box3d.Hybrid
             float scaledRadius = Radius * math.cmax(math.abs(scale));
             return body.CreateSphereShape(BuildDef(), new Sphere { Center = LocalCenter * scale, Radius = scaledRadius });
         }
+
+        private void OnDrawGizmosSelected()
+        {
+            SetGizmoFrame();
+            float radius = Radius * math.cmax(math.abs((float3)transform.lossyScale));
+            Gizmos.DrawWireSphere((Vector3)ScaledCenter, radius);
+        }
     }
 }
