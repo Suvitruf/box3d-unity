@@ -112,6 +112,51 @@ public class HybridSpawner : MonoBehaviour
         }
     }
 
+    // A hinge chain anchored to the world at one end, laid out horizontally so it whips down under
+    // gravity. Exercises hinge joints, connected bodies, and the world anchor (first link's null
+    // connected body). Joints are created in Start, after every link's body exists.
+    private void SpawnChain()
+    {
+        const int links = 6;
+        const float length = 0.6f;
+        const float thickness = 0.15f;
+
+        Vector3 anchor = new Vector3(Random.Range(-3f, 3f), 10f, Random.Range(-3f, 3f));
+        var linkObjects = new List<GameObject>();
+        Box3dBody previous = null; // null on the first link → hinged to the world
+
+        for (int i = 0; i < links; i++)
+        {
+            GameObject link = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            link.SetActive(false);
+            Destroy(link.GetComponent<Collider>());
+            link.transform.position = anchor + new Vector3((i + 0.5f) * length, 0f, 0f);
+            link.transform.localScale = new Vector3(length, thickness, thickness);
+
+            if (BaseMaterial)
+            {
+                link.GetComponent<MeshRenderer>().material =
+                    new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
+            }
+
+            link.AddComponent<Box3dBoxShape>();
+            Box3dBody body = link.AddComponent<Box3dBody>();
+            Box3dHingeJoint hinge = link.AddComponent<Box3dHingeJoint>();
+            hinge.SetConnectedBody(previous);
+            hinge.SetAnchor(new Vector3(-0.5f, 0f, 0f)); // the link's left end (local)
+            hinge.SetAxis(new Vector3(0f, 0f, 1f));      // swing in the x-y plane
+
+            linkObjects.Add(link);
+            previous = body;
+        }
+
+        foreach (GameObject link in linkObjects)
+        {
+            link.SetActive(true); // Awake creates bodies now; joints create in Start next frame
+            _spawned.Add(link);
+        }
+    }
+
     private void Clear()
     {
         foreach (GameObject go in _spawned)
@@ -123,7 +168,7 @@ public class HybridSpawner : MonoBehaviour
 
     private void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10f, 10f, 220f, 320f), GUI.skin.box);
+        GUILayout.BeginArea(new Rect(10f, 10f, 220f, 350f), GUI.skin.box);
         GUILayout.Label("<b>Component layer test</b>", new GUIStyle(GUI.skin.label) { richText = true });
 
         GUILayout.Label($"Count per press: {SpawnCount}");
@@ -138,6 +183,7 @@ public class HybridSpawner : MonoBehaviour
         if (GUILayout.Button($"Spawn {SpawnCount} capsules")) Spawn(ShapeKind.Capsule);
         if (GUILayout.Button($"Spawn {SpawnCount} hulls")) Spawn(ShapeKind.Hull);
         if (GUILayout.Button($"Spawn {SpawnCount} compounds")) SpawnCompound();
+        if (GUILayout.Button("Spawn hinge chain")) SpawnChain();
         if (GUILayout.Button("Clear")) Clear();
 
         GUILayout.FlexibleSpace();
