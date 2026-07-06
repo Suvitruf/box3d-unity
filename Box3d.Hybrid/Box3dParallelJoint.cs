@@ -19,6 +19,15 @@ namespace Box3d.Hybrid
         [SerializeField, Min(0f), Tooltip("Maximum aligning torque in N·m.")]
         private float MaxTorque = 1000f;
 
+        /// <summary>Configures the joint for runtime assembly (before Start).</summary>
+        public void Configure(Box3dBody connected, Vector3 axisLocal, float hertz, float dampingRatio)
+        {
+            SetConnectedBody(connected);
+            Axis = axisLocal;
+            Hertz = hertz;
+            DampingRatio = dampingRatio;
+        }
+
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)
         {
             Vector3 worldAxis = transform.TransformDirection(Axis);

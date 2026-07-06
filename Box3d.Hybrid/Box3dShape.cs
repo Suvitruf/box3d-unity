@@ -41,6 +41,14 @@ namespace Box3d.Hybrid
             if (_shape.IsValid) _shape.SetRestitution(value);
         }
 
+        /// <summary>Sets density (kg/m³), updating the live shape and its body's mass if it exists.
+        /// Set before the body is created to have it apply at build time.</summary>
+        public void SetDensity(float value)
+        {
+            Density = value;
+            if (_shape.IsValid) _shape.SetDensity(value, updateBodyMass: true);
+        }
+
         private void Awake()
         {
             // A body on this GameObject or an ancestor will gather and attach this shape (including

@@ -34,6 +34,9 @@ namespace Box3d.Hybrid
         [SerializeField, Tooltip("Start awake, or asleep until disturbed.")]
         private bool StartAwake = true;
 
+        [SerializeField, Tooltip("Allow fast rotation (e.g. spinning wheels) without box3d clamping angular velocity.")]
+        private bool AllowFastRotation;
+
         private Box3dWorld _world;
         private Body _body;
         private Box3dShape[] _shapes;
@@ -78,6 +81,12 @@ namespace Box3d.Hybrid
             set => Warp(transform.position, value);
         }
 
+        /// <summary>Enables fast rotation (spinning wheels). Set before the body is created (Awake).</summary>
+        public void SetAllowFastRotation(bool value)
+        {
+            AllowFastRotation = value;
+        }
+
         private void Awake()
         {
             _world = Box3dWorld.Instance;
@@ -90,6 +99,7 @@ namespace Box3d.Hybrid
             def.AngularDamping = AngularDamping;
             def.IsAwake = StartAwake;
             def.IsEnabled = isActiveAndEnabled;
+            def.AllowFastRotation = AllowFastRotation;
 
             _handle = GCHandle.Alloc(this);
             def.UserData = GCHandle.ToIntPtr(_handle);

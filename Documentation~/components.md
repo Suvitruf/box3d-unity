@@ -110,16 +110,17 @@ is the local pivot point.
 | `Box3dFixedJoint` | `FixedJoint` | Rigidly welds the bodies at their current pose; optional spring. |
 | `Box3dParallelJoint` | — | Spring keeps an axis aligned (stay upright). |
 | `Box3dFilterJoint` | — | No constraint; disables collision between the two bodies. |
+| `Box3dMotorJoint` | — | Soft, driveable spring toward the rest pose (soft attachment / drag). |
+| `Box3dWheelJoint` | `WheelCollider`-ish | Vehicle suspension: spring travel, free spin, optional steering. |
 
 Frames are computed so the joint is satisfied at the pose you built it in — creating it never snaps
-the bodies. The remaining two box3d joint types (motor, wheel) are code-API only: motor is for
-programmatic dragging, and wheel is a vehicle joint the Vehicle sample demonstrates.
+the bodies. For the wheel joint, put it on the wheel and set Connected Body to the chassis; the
+suspension axis and spin (axle) axis are configurable.
 
 ## Current limits
 
 - Mesh shapes are static-only (use a hull shape for dynamic concave-ish objects). Hull and mesh
   shapes read mesh vertices at runtime, so the mesh asset must have **Read/Write enabled**.
-- Seven of the nine joint types have components; motor and wheel remain code-API.
 
 For anything beyond this, drop to the code API ([getting started](getting-started.md)) — the
 components and the API share the same world and interoperate (`Box3dBody.Body`, `Box3dWorld.World`).

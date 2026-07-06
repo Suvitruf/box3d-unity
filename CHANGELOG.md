@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.1] — 2026-07-06
+
+### Added
+- Motor and wheel joint components, completing all nine joint types as components.
+- `Box3dShape.SetDensity`, `Box3dBody.AllowFastRotation`, joint `WakeBodies`, and runtime
+  `Configure` helpers on the wheel and parallel joints.
+
+### Fixed
+- Joint anchors on scaled GameObjects: world→body-local conversion no longer divides by lossyScale
+  (box3d bodies are unscaled), so joints on a scaled body anchor in the right place.
+
+### Known issues
+- The wheel joint's spin motor does not drive (its target stays at the creation value); use the code
+  API for motorized wheels for now.
+
 ## [0.3.0] — 2026-07-05
 
 ### Added — component layer (author physics in the Inspector)

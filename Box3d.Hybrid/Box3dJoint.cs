@@ -56,6 +56,13 @@ namespace Box3d.Hybrid
             if (_joint.IsValid) _joint.Destroy();
         }
 
+        /// <summary>Wakes both connected bodies. A motor/steer change has no effect on a sleeping
+        /// body, so call this when driving a joint after it may have settled.</summary>
+        public void WakeBodies()
+        {
+            if (_joint.IsValid) _joint.WakeBodies();
+        }
+
         /// <summary>Creates the native joint between the two bodies (bodyA = connected/world,
         /// bodyB = this).</summary>
         protected abstract Joint CreateJoint(BodyId bodyA, BodyId bodyB);
@@ -72,7 +79,7 @@ namespace Box3d.Hybrid
             Vector3 anchor = WorldAnchor;
             baseDef.LocalFrameB = new B3Transform
             {
-                Position = transform.InverseTransformPoint(anchor),
+                Position = ToBodyLocal(transform, anchor),
                 Rotation = frameRotationB,
             };
 
@@ -81,7 +88,7 @@ namespace Box3d.Hybrid
             baseDef.LocalFrameA = ConnectedBody
                 ? new B3Transform
                 {
-                    Position = ConnectedBody.transform.InverseTransformPoint(anchor),
+                    Position = ToBodyLocal(ConnectedBody.transform, anchor),
                     Rotation = math.mul(math.inverse((quaternion)ConnectedBody.transform.rotation), frameWorld),
                 }
                 : new B3Transform { Position = anchor, Rotation = frameWorld }; // world anchor: identity body
@@ -110,7 +117,15 @@ namespace Box3d.Hybrid
         /// <summary>A position-only local frame at a world point, on a body's Transform.</summary>
         protected static B3Transform PointFrame(Transform body, Vector3 worldPoint)
         {
-            return new B3Transform { Position = body.InverseTransformPoint(worldPoint), Rotation = quaternion.identity };
+            return new B3Transform { Position = ToBodyLocal(body, worldPoint), Rotation = quaternion.identity };
+        }
+
+        /// <summary>Converts a world point to a body's local frame WITHOUT scale — box3d bodies are
+        /// unscaled (scale is baked into the shape), so Transform.InverseTransformPoint (which divides
+        /// by lossyScale) would put anchors in the wrong place on a scaled GameObject.</summary>
+        protected static float3 ToBodyLocal(Transform body, Vector3 worldPoint)
+        {
+            return math.mul(math.inverse((quaternion)body.rotation), (float3)(worldPoint - body.position));
         }
     }
 }
