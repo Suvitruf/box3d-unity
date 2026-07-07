@@ -41,6 +41,7 @@ set OUT_DIR=%~dp0..\Plugins\Android\arm64-v8a
   -DANDROID_ABI=arm64-v8a ^
   -DANDROID_PLATFORM=android-23 ^
   -DCMAKE_BUILD_TYPE=Release ^
+  -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" ^
   -DBUILD_SHARED_LIBS=ON ^
   -DBOX3D_SAMPLES=OFF ^
   -DBOX3D_UNIT_TESTS=OFF ^
