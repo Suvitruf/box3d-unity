@@ -60,6 +60,11 @@ The city scene is a mixed real-world load — a town of running-bond brick build
 terrain, smashed by a scripted sequence of wrecking balls (identical seeded content on both engines).
 There, Box3d's *slowest* step matched PhysX's *median* — tighter frame times through the collapses.
 
+A pure-box3d stress test ships too: a [16,290-box pyramid](https://www.youtube.com/watch?v=BtdMbw97Zds),
+one box deep, held upright by contact recycling. It steps in single-digit milliseconds, roughly
+halving once the stack settles to sleep — throw spheres to wake and collapse it, and dial the worker
+thread count to see how box3d's built-in scheduler scales. Ships in the Benchmarks sample.
+
 Box3d's threading scales with the number of independent simulation islands — piles, debris, and
 crowds are its home turf; one giant coupled constraint network is its least favorable shape.
 
@@ -129,7 +134,9 @@ world.Destroy();
 
 See `Documentation~/getting-started.md` for the full walkthrough, and install the **samples** from
 the Package Manager window: an interactive playground, basic simulation, joints, mouse drag,
-character controller, a drivable vehicle, and benchmark scenes comparing against PhysX.
+character controller, a drivable vehicle, and benchmark scenes comparing against PhysX — including a
+[16,290-box pyramid stress test](https://www.youtube.com/watch?v=BtdMbw97Zds) you can smash by
+throwing spheres.
 The sample scenes assume URP (they render fine elsewhere, minus materials), and the interactive
 ones require the Input System package.
 

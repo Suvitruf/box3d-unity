@@ -50,6 +50,10 @@ namespace Box3d.Hybrid
 
         private WheelJoint _wheel;
 
+        /// <summary>The underlying native wheel joint (valid after Start) — escape hatch to the
+        /// code API for state the component doesn't expose.</summary>
+        public WheelJoint Native => _wheel;
+
         /// <summary>Configures the wheel for runtime assembly (before the joint is created in Start):
         /// connects it to the chassis, sets the axle direction, and enables drive/steering.</summary>
         public void Configure(Box3dBody chassis, Vector3 spinAxisLocal, bool drive, bool steerable)

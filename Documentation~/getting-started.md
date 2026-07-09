@@ -82,4 +82,6 @@ Sleeping bodies produce no events, so a settled scene costs almost nothing to sy
 
 - [Core concepts](concepts.md) — the handle/def/lifetime rules everything else assumes.
 - Install the package samples (Package Manager → this package → Samples) for working scenes:
-  basic simulation, joints, mouse dragging, a character controller, and a drivable vehicle.
+  basic simulation, joints, mouse dragging, a character controller, a drivable vehicle, and
+  benchmark scenes — including a [16,290-box pyramid stress test](https://www.youtube.com/watch?v=BtdMbw97Zds)
+  (throw spheres to smash it; adjustable worker threads and live step-time metrics).

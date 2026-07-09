@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1] — 2026-07-09
+
+### Added
+- Pyramid stress-test scene in the Benchmarks sample — Erin Catto's 16,290-box pyramid, one box deep,
+  held stable by contact recycling. Throw spheres to smash it, adjust the worker-thread count, and
+  watch live step/FPS/object metrics (CSV export). ([demo](https://www.youtube.com/watch?v=BtdMbw97Zds))
+- `Box3dWheelJoint.Native` — accessor to the underlying native wheel joint.
+
 ## [0.4.0] — 2026-07-08
 
 ### Added

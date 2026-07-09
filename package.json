@@ -1,6 +1,6 @@
 {
   "name": "com.suvitruf.box3d",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "displayName": "Box3d for Unity",
   "description": "Unity bindings for Box3d, Erin Catto's 3D physics engine. Full C API coverage via P/Invoke: rigid bodies, six shape types, nine joint types, queries, contact/sensor events, a character mover toolkit and debug drawing — with deterministic simulation and strong multithreaded performance.",
   "unity": "6000.0",
@@ -57,7 +57,7 @@
     },
     {
       "displayName": "Benchmarks vs PhysX",
-      "description": "Side-by-side performance scenes (sphere rain, joint-grid cloth, island workloads) comparing Box3d and Unity's built-in PhysX, with CSV metric export.",
+      "description": "Performance scenes with CSV metric export: side-by-side vs Unity's PhysX (sphere rain, joint-grid cloth, island workloads), plus a 16,290-box pyramid stress test (throw spheres to smash it, adjustable worker threads).",
       "path": "Samples~/Benchmarks"
     },
     {
