@@ -22,6 +22,14 @@ namespace Box3d.Hybrid
         [SerializeField, Min(0), Tooltip("Box3d worker threads. 0 = auto (about half the logical cores).")]
         private int WorkerCount = 0;
 
+        [SerializeField, Tooltip("Overlay physics debug geometry in the Scene view each frame (None = off). " +
+            "Enable Contacts / Islands / Forces / Bounds to see the solver's view of the world. " +
+            "For the Game view, turn on its Gizmos toggle.")]
+        private DebugDrawFlags DebugDraw = DebugDrawFlags.None;
+
+        [SerializeField, Min(1f), Tooltip("Half-size of the box around the origin that debug drawing covers.")]
+        private float DebugDrawRadius = 200f;
+
         // Only kinematic bodies need per-frame attention (they follow their Transform). Dynamic
         // bodies sync back through move events — which report only bodies that actually moved — so
         // they never appear here. Bodies map back to their component through a GCHandle in userData,
@@ -117,6 +125,16 @@ namespace Box3d.Hybrid
                 {
                     body.ApplyMoveEvent(moveEvent.Transform);
                 }
+            }
+        }
+
+        private void LateUpdate()
+        {
+            // Debug overlay: box3d emits its geometry through the debug-draw bridge as Scene-view lines.
+            // Drawn after the step + transform sync so it reflects the current pose.
+            if (DebugDraw != DebugDrawFlags.None && _world.IsValid)
+            {
+                _world.DrawDebug(DebugDraw, DebugDrawRadius);
             }
         }
 
