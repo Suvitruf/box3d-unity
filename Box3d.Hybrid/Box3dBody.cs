@@ -37,11 +37,17 @@ namespace Box3d.Hybrid
         [SerializeField, Tooltip("Allow fast rotation (e.g. spinning wheels) without box3d clamping angular velocity.")]
         private bool AllowFastRotation;
 
+        [Header("Motion Locks (like Rigidbody.constraints)")]
+        [SerializeField] private bool FreezePositionX;
+        [SerializeField] private bool FreezePositionY;
+        [SerializeField] private bool FreezePositionZ;
+        [SerializeField] private bool FreezeRotationX;
+        [SerializeField] private bool FreezeRotationY;
+        [SerializeField] private bool FreezeRotationZ;
+
         private Box3dWorld _world;
         private Body _body;
         private Box3dShape[] _shapes;
-        // A handle to this component lives in the native body's userData, so a body-move event
-        // dereferences straight back here — no managed-side lookup list.
         private GCHandle _handle;
 
         /// <summary>The underlying Box3d body (valid between Awake and OnDestroy).</summary>
@@ -61,8 +67,12 @@ namespace Box3d.Hybrid
 
                 _body.SetType(ToNative(value));
                 bool isKinematic = value == Box3dBodyType.Kinematic;
+                bool wasDynamic = !wasKinematic;
+                bool isDynamic = !isKinematic;
                 if (isKinematic && !wasKinematic) _world.AddKinematic(this);
                 else if (!isKinematic && wasKinematic) _world.RemoveKinematic(this);
+                if (isDynamic && !wasDynamic) _world.AddDynamic(this);
+                else if (!isDynamic && wasDynamic) _world.RemoveDynamic(this);
             }
         }
 
@@ -105,6 +115,8 @@ namespace Box3d.Hybrid
             def.UserData = GCHandle.ToIntPtr(_handle);
             _body = _world.World.CreateBody(def);
 
+            ApplyMotionLocks();
+
             var shapes = new System.Collections.Generic.List<Box3dShape>();
             GatherShapes(transform, shapes, isRoot: true);
             _shapes = shapes.ToArray();
@@ -119,6 +131,7 @@ namespace Box3d.Hybrid
             }
 
             if (Type == Box3dBodyType.Kinematic) _world.AddKinematic(this);
+            if (Type == Box3dBodyType.Dynamic) _world.AddDynamic(this);
             transform.hasChanged = false;
         }
 
@@ -138,6 +151,7 @@ namespace Box3d.Hybrid
         private void OnDestroy()
         {
             if (Type == Box3dBodyType.Kinematic && _world) _world.RemoveKinematic(this);
+            if (Type == Box3dBodyType.Dynamic && _world) _world.RemoveDynamic(this);
             if (_body.IsValid) _body.Destroy();
             // Free referenced geometry (meshes) only after the body — and its shapes — are gone.
             if (_shapes != null)
@@ -168,11 +182,18 @@ namespace Box3d.Hybrid
         private static readonly System.Collections.Generic.List<Box3dShape> TempShapes =
             new System.Collections.Generic.List<Box3dShape>();
 
+        /// <summary>Called by the world before each step to sync a Dynamic body's Transform changes to the native body.</summary>
+        internal void SyncFromTransform()
+        {
+            if (!_body.IsValid) return;
+            _body.SetTransform(transform.position, transform.rotation);
+            _body.SetAwake(true);
+        }
+
         /// <summary>Called by the world (kinematic list only) before each step.</summary>
         internal void PushKinematic(float deltaTime)
         {
             if (!isActiveAndEnabled || !_body.IsValid) return;
-
             var target = new B3Transform { Position = transform.position, Rotation = transform.rotation };
             _body.SetTargetTransform(target, deltaTime, wake: true);
         }
@@ -181,7 +202,6 @@ namespace Box3d.Hybrid
         internal void ApplyMoveEvent(B3Transform moved)
         {
             transform.SetPositionAndRotation(moved.Position, moved.Rotation);
-            transform.hasChanged = false; // our own write must not read back as a user move
         }
 
         private void Warp(Vector3 position, Quaternion rotation)
@@ -192,23 +212,7 @@ namespace Box3d.Hybrid
                 _body.SetTransform(position, rotation);
                 if (Type == Box3dBodyType.Dynamic) _body.SetAwake(true);
             }
-            transform.hasChanged = false;
         }
-
-#if UNITY_EDITOR
-        private void Update()
-        {
-            // Editor authoring convenience: pick up Scene-view Transform drags during play for
-            // non-kinematic bodies (kinematic ones already follow the Transform). Cheap bool check,
-            // editor-only — shipped builds never poll.
-            if (!Application.isPlaying || Type == Box3dBodyType.Kinematic || !_body.IsValid) return;
-            if (!transform.hasChanged) return;
-
-            transform.hasChanged = false;
-            _body.SetTransform(transform.position, transform.rotation);
-            if (Type == Box3dBodyType.Dynamic) _body.SetAwake(true);
-        }
-#endif
 
 #if UNITY_EDITOR
         private void OnValidate()
@@ -219,10 +223,25 @@ namespace Box3d.Hybrid
             _body.SetType(ToNative(Type));
             _body.SetLinearDamping(LinearDamping);
             _body.SetAngularDamping(AngularDamping);
+            ApplyMotionLocks();
             if (Type == Box3dBodyType.Kinematic) _world.AddKinematic(this);
             else _world.RemoveKinematic(this);
         }
 #endif
+
+        private void ApplyMotionLocks()
+        {
+            if (!_body.IsValid) return;
+            _body.SetMotionLocks(new MotionLocks
+            {
+                LinearX = FreezePositionX,
+                LinearY = FreezePositionY,
+                LinearZ = FreezePositionZ,
+                AngularX = FreezeRotationX,
+                AngularY = FreezeRotationY,
+                AngularZ = FreezeRotationZ,
+            });
+        }
 
         private static Box3d.BodyType ToNative(Box3dBodyType type)
         {

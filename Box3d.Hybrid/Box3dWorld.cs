@@ -1,26 +1,112 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Box3d.Hybrid
 {
-    /// <summary>Scene-level owner of a Box3d simulation world. Steps from FixedUpdate, pushes
-    /// kinematic bodies before the step and syncs moved bodies back after. Auto-created on demand
-    /// (like Unity's single physics world); place one explicitly to tune gravity, sub-steps, or
-    /// worker count.</summary>
+
+    public static class Box3dQuery
+    {
+        public const int MaxHits = 64;
+
+        public static bool Raycast(Vector3 origin, Vector3 direction, out Box3dRaycastHit hit, float maxDistance, int layerMask)
+        {
+            hit = default;
+            var world = Box3dWorld.Instance.World;
+            var filter = QueryFilterForMask(layerMask);
+            RayResult result = world.CastRayClosest(origin, direction * maxDistance, filter);
+            if (!result.Hit) return false;
+            hit = new Box3dRaycastHit
+            {
+                point = result.Point,
+                normal = result.Normal,
+                fraction = result.Fraction,
+                shapeId = result.ShapeId,
+                hit = true,
+            };
+            return true;
+        }
+
+        public static int RaycastAll(Vector3 origin, Vector3 direction, Box3dRaycastHit[] results, float maxDistance, int layerMask)
+        {
+            var world = Box3dWorld.Instance.World;
+            var filter = QueryFilterForMask(layerMask);
+            Span<RayHit> hits = stackalloc RayHit[MaxHits];
+            int count = world.CastRay(origin, direction * maxDistance, filter, hits);
+            int resultCount = Mathf.Min(count, results.Length);
+            for (int i = 0; i < resultCount; i++)
+            {
+                results[i] = new Box3dRaycastHit
+                {
+                    point = hits[i].Point,
+                    normal = hits[i].Normal,
+                    fraction = hits[i].Fraction,
+                    shapeId = hits[i].ShapeId,
+                    hit = true,
+                };
+            }
+            return resultCount;
+        }
+
+        public static int OverlapSphere(Vector3 position, float radius, Box3dRaycastHit[] results, int layerMask)
+        {
+            var world = Box3dWorld.Instance.World;
+            var filter = QueryFilterForMask(layerMask);
+            Span<ShapeId> shapeIds = stackalloc ShapeId[MaxHits];
+            Span<float3> proxy = stackalloc float3[1];
+            proxy[0] = float3.zero;
+            int count = world.OverlapShape(position, proxy, radius, filter, shapeIds);
+            int resultCount = Mathf.Min(count, results.Length);
+            for (int i = 0; i < resultCount; i++)
+            {
+                results[i] = new Box3dRaycastHit { shapeId = shapeIds[i], hit = true };
+            }
+            return resultCount;
+        }
+
+        internal static QueryFilter QueryFilterForMask(int layerMask)
+        {
+            return new QueryFilter { CategoryBits = ulong.MaxValue, MaskBits = (ulong)layerMask };
+        }
+
+        public static Box3dShape ShapeIdToComponent(ShapeId shapeId)
+        {
+            return Box3dWorld.Instance.GetShapeComponent(shapeId);
+        }
+    }
+
+    public struct Box3dRaycastHit
+    {
+        public Vector3 point;
+        public Vector3 normal;
+        public float fraction;
+        public ShapeId shapeId;
+        public bool hit;
+
+        public Box3dShape ShapeComponent => hit ? Box3dWorld.Instance.GetShapeComponent(shapeId) : null;
+        public T GetComponentInParent<T>() => ShapeComponent ? ShapeComponent.GetComponentInParent<T>() : default;
+    }
+
+    /// <summary>Scene-level owner of a Box3d simulation world. Step() must be called externally
+    /// (by ManualPhysicsController.OnAnimatorMove) at a fixed tick rate. Syncs kinematic and
+    /// dynamic bodies before the step writes moved bodies back after.</summary>
     [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
     public class Box3dWorld : MonoBehaviour
     {
         [SerializeField, Tooltip("Gravity vector applied to every dynamic body.")]
-        private Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
+        private Vector3 Gravity = new Vector3(0f, -100f, 0f);
 
         [SerializeField, Min(1), Tooltip("Solver sub-steps per step. Higher = stiffer, slower.")]
-        private int SubStepCount = 4;
+        private int SubStepCount = 6;
 
-        [SerializeField, Min(0), Tooltip("Box3d worker threads. 0 = auto (about half the logical cores).")]
-        private int WorkerCount = 0;
+        [SerializeField, Min(1), Tooltip("Box3d worker threads. 1 = deterministic, single-threaded. Use 1 for rollback netcode.")]
+        private int WorkerCount = 1;
+
+        /// <summary>Set to true during rollback replay to prevent LateUpdate from pushing Transform changes to the body.</summary>
+        public static bool IsReplaying;
 
         [SerializeField, Tooltip("Overlay physics debug geometry in the Scene view each frame (None = off). " +
             "Enable Contacts / Islands / Forces / Bounds to see the solver's view of the world. " +
@@ -30,21 +116,19 @@ namespace Box3d.Hybrid
         [SerializeField, Min(1f), Tooltip("Half-size of the box around the origin that debug drawing covers.")]
         private float DebugDrawRadius = 200f;
 
-        // Only kinematic bodies need per-frame attention (they follow their Transform). Dynamic
-        // bodies sync back through move events — which report only bodies that actually moved — so
-        // they never appear here. Bodies map back to their component through a GCHandle in userData,
-        // so no all-bodies list is kept.
         private readonly List<Box3dBody> _kinematicBodies = new List<Box3dBody>();
+        private readonly List<Box3dBody> _dynamicBodies = new List<Box3dBody>();
+        private readonly Dictionary<ulong, Box3dShape> _shapeMap = new Dictionary<ulong, Box3dShape>();
 
         private World _world;
         private Body _anchor;
+        private Vector3 _lastGravity;
         private static Box3dWorld _instance;
 
-        /// <summary>The underlying Box3d world (valid after this component is enabled).</summary>
         public World World => _world;
 
-        /// <summary>A shared static body at the origin, used as the fixed endpoint for joints whose
-        /// connected body is null (like Unity's null connectedBody = attach to the world).</summary>
+        public int WorldSubStepCount => SubStepCount;
+
         public Body WorldAnchor
         {
             get
@@ -52,13 +136,12 @@ namespace Box3d.Hybrid
                 if (!_anchor.IsValid)
                 {
                     EnsureCreated();
-                    _anchor = _world.CreateBody(BodyDef.Default); // static at origin
+                    _anchor = _world.CreateBody(BodyDef.Default);
                 }
                 return _anchor;
             }
         }
 
-        /// <summary>The active world component, creating one if the scene has none.</summary>
         public static Box3dWorld Instance
         {
             get
@@ -85,13 +168,13 @@ namespace Box3d.Hybrid
             EnsureCreated();
         }
 
-        private void EnsureCreated()
+        public void EnsureCreated()
         {
             if (_world.IsValid) return;
 
             WorldDef def = WorldDef.Default;
             def.Gravity = Gravity;
-            def.WorkerCount = (uint)(WorkerCount > 0 ? WorkerCount : Mathf.Max(1, SystemInfo.processorCount / 2));
+            def.WorkerCount = (uint)WorkerCount;
             _world = World.Create(def);
         }
 
@@ -105,15 +188,61 @@ namespace Box3d.Hybrid
             _kinematicBodies.Remove(body);
         }
 
-        private void FixedUpdate()
+        internal void AddDynamic(Box3dBody body)
+        {
+            if (!_dynamicBodies.Contains(body)) _dynamicBodies.Add(body);
+        }
+
+        internal void RemoveDynamic(Box3dBody body)
+        {
+            _dynamicBodies.Remove(body);
+        }
+
+        public int CollectDynamicBodies(ref Box3dBody[] buffer)
+        {
+            if (buffer == null || buffer.Length < _dynamicBodies.Count)
+                buffer = new Box3dBody[_dynamicBodies.Count];
+            _dynamicBodies.CopyTo(buffer);
+            return _dynamicBodies.Count;
+        }
+
+        internal void RegisterShape(ShapeId shapeId, Box3dShape shape)
+        {
+            _shapeMap[shapeId.ToUInt64()] = shape;
+        }
+
+        internal void UnregisterShape(ShapeId shapeId)
+        {
+            _shapeMap.Remove(shapeId.ToUInt64());
+        }
+
+        public Box3dShape GetShapeComponent(ShapeId shapeId)
+        {
+            _shapeMap.TryGetValue(shapeId.ToUInt64(), out var shape);
+            return shape;
+        }
+
+        public void Step(float deltaTime)
         {
             if (!_world.IsValid) return;
 
-            float deltaTime = Time.fixedDeltaTime;
+            if (_lastGravity != Gravity)
+            {
+                _lastGravity = Gravity;
+                _world.SetGravity(Gravity);
+            }
+
             for (int i = 0; i < _kinematicBodies.Count; i++)
             {
                 Box3dBody body = _kinematicBodies[i];
+                if (body) body.SyncFromTransform();
                 if (body) body.PushKinematic(deltaTime);
+            }
+
+            for (int i = 0; i < _dynamicBodies.Count; i++)
+            {
+                Box3dBody body = _dynamicBodies[i];
+                if (body) body.SyncFromTransform();
             }
 
             _world.Step(deltaTime, SubStepCount);

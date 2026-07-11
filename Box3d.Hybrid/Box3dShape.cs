@@ -1,3 +1,5 @@
+using System;
+using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -20,43 +22,43 @@ namespace Box3d.Hybrid
         private float Restitution;
 
         [SerializeField, Tooltip("Local offset of the shape from the body origin.")]
-        private Vector3 Center = Vector3.zero;
+        protected Vector3 Center = Vector3.zero;
+
+        [SerializeField, Tooltip("Is this shape a sensor (trigger)?")]
+        private bool IsSensor;
+
+        [SerializeField, Tooltip("Enable sensor events for trigger-style detection.")]
+        private bool EnableSensorEvents = true;
+
+        [SerializeField, Tooltip("Enable contact events for OnCollision-style detection.")]
+        private bool EnableContactEvents;
 
         private Shape _shape;
-        private Body _ownBody; // only set when this shape has no Box3dBody and creates a static one
+        private Body _ownBody;
+        private GCHandle _selfHandle;
+
+        public ShapeId ShapeId => _shape.Id;
+        public Shape Shape => _shape;
+        public bool IsSensorShape => IsSensor;
+
+        public float CapsuleRadius { get; protected set; }
+        public float CapsuleHeight { get; protected set; }
+
+        public Vector3 ShapeLocalCenter => Center;
 
         protected float3 LocalCenter => Center;
 
-        /// <summary>Sets friction, updating the live shape if it exists.</summary>
-        public void SetFriction(float value)
-        {
-            Friction = value;
-            if (_shape.IsValid) _shape.SetFriction(value);
-        }
-
-        /// <summary>Sets bounciness, updating the live shape if it exists.</summary>
-        public void SetRestitution(float value)
-        {
-            Restitution = value;
-            if (_shape.IsValid) _shape.SetRestitution(value);
-        }
-
-        /// <summary>Sets density (kg/m³), updating the live shape and its body's mass if it exists.
-        /// Set before the body is created to have it apply at build time.</summary>
-        public void SetDensity(float value)
-        {
-            Density = value;
-            if (_shape.IsValid) _shape.SetDensity(value, updateBodyMass: true);
-        }
+        public void SetFriction(float value) { Friction = value; if (_shape.IsValid) _shape.SetFriction(value); }
+        public void SetRestitution(float value) { Restitution = value; if (_shape.IsValid) _shape.SetRestitution(value); }
+        public void SetDensity(float value) { Density = value; if (_shape.IsValid) _shape.SetDensity(value, updateBodyMass: true); }
 
         private void Awake()
         {
-            // A body on this GameObject or an ancestor will gather and attach this shape (including
-            // as a compound child). Otherwise the shape is an orphan → give it a static body.
             if (GetComponentInParent<Box3dBody>()) return;
 
             Box3dWorld world = Box3dWorld.Instance;
-            BodyDef def = BodyDef.Default; // static by default
+            world.EnsureCreated();
+            BodyDef def = BodyDef.Default;
             def.Position = transform.position;
             def.Rotation = transform.rotation;
             _ownBody = world.World.CreateBody(def);
@@ -65,8 +67,12 @@ namespace Box3d.Hybrid
 
         private void OnDestroy()
         {
-            // Only the self-created static body is ours to tear down; body-managed shapes are
-            // released by their Box3dBody after it destroys the body.
+            if (_shape.IsValid)
+            {
+                Box3dWorld.Instance.UnregisterShape(_shape.Id);
+            }
+            if (_selfHandle.IsAllocated) _selfHandle.Free();
+
             if (_ownBody.IsValid)
             {
                 _ownBody.Destroy();
@@ -74,9 +80,6 @@ namespace Box3d.Hybrid
             }
         }
 
-        /// <summary>A shape definition seeded from this component's material fields and the
-        /// GameObject's Unity collision layer (so Project Settings → Physics → Layer Collision
-        /// Matrix is honored).</summary>
         protected ShapeDef BuildDef()
         {
             ShapeDef def = ShapeDef.Default;
@@ -85,11 +88,15 @@ namespace Box3d.Hybrid
             def.BaseMaterial.Restitution = Restitution;
             def.Filter.CategoryBits = 1UL << gameObject.layer;
             def.Filter.MaskBits = CollisionMaskForLayer(gameObject.layer);
+            def.IsSensor = IsSensor;
+            def.EnableSensorEvents = EnableSensorEvents;
+            def.EnableContactEvents = EnableContactEvents;
+
+            _selfHandle = GCHandle.Alloc(this);
+            def.UserData = GCHandle.ToIntPtr(_selfHandle);
             return def;
         }
 
-        // Builds a box3d mask from Unity's layer collision matrix: bit L is set for every layer
-        // this layer is allowed to collide with.
         private static ulong CollisionMaskForLayer(int layer)
         {
             ulong mask = 0;
@@ -100,32 +107,40 @@ namespace Box3d.Hybrid
             return mask;
         }
 
-        /// <summary>Creates the native shape on the given body. <paramref name="localPosition"/> and
-        /// <paramref name="localRotation"/> place the shape relative to the body's frame (identity
-        /// for a shape on the body's own GameObject); <paramref name="scale"/> is the shape
-        /// GameObject's lossy scale, baked into the dimensions.</summary>
         internal void AttachTo(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
             _shape = CreateShape(body, localPosition, localRotation, scale);
+            if (_shape.IsValid)
+            {
+                Box3dWorld.Instance.RegisterShape(_shape.Id, this);
+                _shape.UserData = BuildDef().UserData;
+            }
         }
 
         protected abstract Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale);
 
-        /// <summary>Frees any native geometry this shape owns. Called after the body — and its
-        /// shapes — are destroyed, so referenced mesh/heightfield data outlives its shape.</summary>
         internal virtual void ReleaseGeometry() { }
 
-        /// <summary>The shape's local center offset, rotated and offset into the body frame.</summary>
         protected float3 ShapeCenter(float3 localPosition, quaternion localRotation, float3 scale)
         {
             return localPosition + math.mul(localRotation, LocalCenter * scale);
         }
 
-        // The color Unity uses for collider gizmos, so these read as familiar.
+        public Vector3 GetClosestPoint(Vector3 point)
+        {
+            var body = new Body { Id = _shape.GetBody() };
+            var bodyPos = body.Position;
+            var localPt = math.mul(math.inverse(body.Rotation), (float3)point - bodyPos);
+            return ClosestPointLocal(localPt);
+        }
+
+        protected virtual Vector3 ClosestPointLocal(float3 localPoint)
+        {
+            return transform.position;
+        }
+
         private static readonly Color GizmoColor = new Color(0.5f, 0.9f, 0.6f, 0.9f);
 
-        /// <summary>Sets the gizmo color and a position+rotation frame at the shape's own Transform
-        /// (which is where the physics shape ends up, self or compound child).</summary>
         protected void SetGizmoFrame()
         {
             Gizmos.color = GizmoColor;

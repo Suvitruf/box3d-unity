@@ -25,8 +25,13 @@ namespace Box3d.Hybrid
         [SerializeField, Tooltip("Axis the capsule runs along.")]
         private Box3dAxis Direction = Box3dAxis.Y;
 
+        public float ShapeRadius => Radius;
+        public float ShapeHeight => Height;
+
         protected override Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
+            CapsuleRadius = Radius;
+            CapsuleHeight = Height;
             Resolve(localPosition, localRotation, scale, out float3 center1, out float3 center2, out float radius);
             return body.CreateCapsuleShape(BuildDef(), new Capsule
             {
@@ -34,6 +39,19 @@ namespace Box3d.Hybrid
                 Center2 = center2,
                 Radius = radius,
             });
+        }
+
+        protected override Vector3 ClosestPointLocal(float3 localPoint)
+        {
+            Resolve(float3.zero, quaternion.identity, Vector3.one, out float3 c1, out float3 c2, out float r);
+            float3 axis = c2 - c1;
+            float lenSq = math.lengthsq(axis);
+            if (lenSq < 1e-6f) return (Vector3)c1 + (Vector3)(math.normalize(localPoint - c1) * r);
+
+            float t = math.dot(localPoint - c1, axis) / lenSq;
+            t = math.clamp(t, 0f, 1f);
+            float3 closestAxis = c1 + t * axis;
+            return (Vector3)(closestAxis + math.normalize(localPoint - closestAxis) * r);
         }
 
         // The two hemisphere centers and radius after baking the local transform and scale —
