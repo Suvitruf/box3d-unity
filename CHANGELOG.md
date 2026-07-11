@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0] — 2026-07-11
+
+### Added — diagnostics & debug tooling
+- **Debug-draw overlay on `Box3dWorld`**: a `DebugDrawFlags` mask in the Inspector overlays collision
+  shapes, joints, contacts, normals/forces, AABBs, mass, islands and graph colors into the Scene view —
+  no code needed.
+- **`Box3dStatsHud`**: a drop-in on-screen overlay — FPS, step time, awake/total body count, live
+  shape/contact/joint/island counts and memory, and a per-phase step-time breakdown.
+- **`World.GetProfile()` / `World.GetCounters()`**: public `Profile` (per-phase step timings) and
+  `Counters` (live counts + allocator/broadphase stats) for programmatic profiling. Plus
+  `GetAwakeBodyCount()`.
+- **`out TreeStats` query overloads** on ray/overlap/shape casts — the broadphase nodes a query visited
+  (its spatial cost), previously discarded.
+
 ## [0.4.2] — 2026-07-10
 
 ### Fixed

@@ -39,7 +39,10 @@ This project was inspired by, and owes its architecture to, two projects:
   with a ready-made sample controller.
 - **Callbacks** — custom collision filtering, pre-solve contact veto, friction/restitution mixing
   (with clear worker-thread safety rules).
-- **Extras** — explosions, wind, conveyor surface materials, debug-draw bridge to the Scene view.
+- **Diagnostics** — debug-draw overlay (shapes, contacts, forces, islands) toggled right on the
+  `Box3dWorld` component; a drop-in stats HUD (step time, per-phase profile, live counts); and
+  `World.GetProfile()` / `GetCounters()` for programmatic profiling.
+- **Extras** — explosions, wind, conveyor surface materials.
 - **Multithreading** — box3d's internal scheduler, configurable worker count per world.
 - **Component layer (experimental)** — author bodies and shapes in the Inspector, mirroring
   Unity's Rigidbody/Collider model (see the docs).
