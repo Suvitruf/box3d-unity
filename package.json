@@ -3,7 +3,7 @@
   "version": "0.4.2",
   "displayName": "Box3d for Unity",
   "description": "Unity bindings for Box3d, Erin Catto's 3D physics engine. Full C API coverage via P/Invoke: rigid bodies, six shape types, nine joint types, queries, contact/sensor events, a character mover toolkit and debug drawing — with deterministic simulation and strong multithreaded performance.",
-  "unity": "6000.0",
+  "unity": "2022.3",
   "license": "MIT",
   "author": {
     "name": "Suvitruf",

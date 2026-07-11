@@ -57,7 +57,7 @@ namespace Box3d.Hybrid
             {
                 if (!_instance)
                 {
-                    _instance = FindAnyObjectByType<Box3dWorld>();
+                    _instance = FindObjectOfType<Box3dWorld>();
                     if (!_instance)
                     {
                         _instance = new GameObject("Box3d World").AddComponent<Box3dWorld>();
