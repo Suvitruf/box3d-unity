@@ -20,6 +20,7 @@ namespace Box3d.Hybrid
         private bool CollideConnected;
 
         private Joint _joint;
+        protected Joint NativeJoint => _joint;
 
         /// <summary>The world owning this joint (valid after Start).</summary>
         protected Box3dWorld World { get; private set; }
@@ -120,7 +121,7 @@ namespace Box3d.Hybrid
         }
 
         /// <summary>The connected body (null = world), for joints that place two distinct anchors.</summary>
-        protected Box3dBody Connected => ConnectedBody;
+        public Box3dBody Connected => ConnectedBody;
 
         /// <summary>Whether connected bodies are allowed to collide.</summary>
         protected bool Collides => CollideConnected;

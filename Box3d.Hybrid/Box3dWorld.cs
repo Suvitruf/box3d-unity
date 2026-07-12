@@ -6,6 +6,7 @@ using UnityEngine;
 
 namespace Box3d.Hybrid
 {
+    public interface IBox3dSensorHandler { Box3dShape SensorShape { get; } void OnBox3dSensorEnter(Box3dShape other); void OnBox3dSensorExit(Box3dShape other); }
 
     public static class Box3dQuery
     {
@@ -97,10 +98,10 @@ namespace Box3d.Hybrid
     public class Box3dWorld : MonoBehaviour
     {
         [SerializeField, Tooltip("Gravity vector applied to every dynamic body.")]
-        private Vector3 Gravity = new Vector3(0f, -100f, 0f);
+        private Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
 
         [SerializeField, Min(1), Tooltip("Solver sub-steps per step. Higher = stiffer, slower.")]
-        private int SubStepCount = 6;
+        private int SubStepCount = 4;
 
         [SerializeField, Min(1), Tooltip("Box3d worker threads. 1 = deterministic, single-threaded. Use 1 for rollback netcode.")]
         private int WorkerCount = 1;
@@ -118,6 +119,8 @@ namespace Box3d.Hybrid
 
         private readonly List<Box3dBody> _kinematicBodies = new List<Box3dBody>();
         private readonly List<Box3dBody> _dynamicBodies = new List<Box3dBody>();
+        private readonly List<Box3dShape> _standaloneShapes = new List<Box3dShape>();
+        private readonly List<IBox3dSensorHandler> _sensorHandlers = new List<IBox3dSensorHandler>();
         private readonly Dictionary<ulong, Box3dShape> _shapeMap = new Dictionary<ulong, Box3dShape>();
 
         private World _world;
@@ -188,6 +191,9 @@ namespace Box3d.Hybrid
             _kinematicBodies.Remove(body);
         }
 
+        internal void RegisterStandaloneShape(Box3dShape shape) { if (!_standaloneShapes.Contains(shape)) _standaloneShapes.Add(shape); }
+        internal void UnregisterStandaloneShape(Box3dShape shape) { _standaloneShapes.Remove(shape); }
+
         internal void AddDynamic(Box3dBody body)
         {
             if (!_dynamicBodies.Contains(body)) _dynamicBodies.Add(body);
@@ -197,6 +203,8 @@ namespace Box3d.Hybrid
         {
             _dynamicBodies.Remove(body);
         }
+
+        public void UnsyncBody(Box3dBody body) { _kinematicBodies.Remove(body); _dynamicBodies.Remove(body); }
 
         public int CollectDynamicBodies(ref Box3dBody[] buffer)
         {
@@ -222,6 +230,9 @@ namespace Box3d.Hybrid
             return shape;
         }
 
+        public void RegisterSensorHandler(IBox3dSensorHandler h) { if (!_sensorHandlers.Contains(h)) _sensorHandlers.Add(h); }
+        public void UnregisterSensorHandler(IBox3dSensorHandler h) { _sensorHandlers.Remove(h); }
+
         public void Step(float deltaTime)
         {
             if (!_world.IsValid) return;
@@ -239,6 +250,12 @@ namespace Box3d.Hybrid
                 if (body) body.PushKinematic(deltaTime);
             }
 
+            for (int i = 0; i < _standaloneShapes.Count; i++)
+            {
+                Box3dShape shape = _standaloneShapes[i];
+                if (shape) shape.SyncTransform();
+            }
+
             for (int i = 0; i < _dynamicBodies.Count; i++)
             {
                 Box3dBody body = _dynamicBodies[i];
@@ -253,6 +270,23 @@ namespace Box3d.Hybrid
                 if (GCHandle.FromIntPtr(moveEvent.UserData).Target is Box3dBody body)
                 {
                     body.ApplyMoveEvent(moveEvent.Transform);
+                }
+            }
+
+            if (_sensorHandlers.Count > 0)
+            {
+                SensorEvents events = _world.GetSensorEvents();
+                foreach (var begin in events.Begin)
+                {
+                    var a = GetShapeComponent(begin.SensorShapeId); var b = GetShapeComponent(begin.VisitorShapeId);
+                    if (!a || !b || !a.enabled || !b.enabled) continue;
+                    foreach (var h in _sensorHandlers) { if (h.SensorShape == a) h.OnBox3dSensorEnter(b); else if (h.SensorShape == b) h.OnBox3dSensorEnter(a); }
+                }
+                foreach (var end in events.End)
+                {
+                    var a = GetShapeComponent(end.SensorShapeId); var b = GetShapeComponent(end.VisitorShapeId);
+                    if (!a || !b || !a.enabled || !b.enabled) continue;
+                    foreach (var h in _sensorHandlers) { if (h.SensorShape == a) h.OnBox3dSensorExit(b); else if (h.SensorShape == b) h.OnBox3dSensorExit(a); }
                 }
             }
         }

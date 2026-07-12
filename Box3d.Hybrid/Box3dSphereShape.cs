@@ -13,6 +13,11 @@ namespace Box3d.Hybrid
 
         public float ShapeRadius => Radius;
 
+        public void ConfigureSensor(float radius, Vector3 center)
+        {
+            Radius = radius; Center = center;
+        }
+
         protected override Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
             float scaledRadius = Radius * math.cmax(math.abs(scale));

@@ -28,6 +28,11 @@ namespace Box3d.Hybrid
         public float ShapeRadius => Radius;
         public float ShapeHeight => Height;
 
+        public void ConfigureSensor(float radius, float height, Vector3 center, Box3dAxis direction)
+        {
+            Radius = radius; Height = height; Center = center; Direction = direction;
+        }
+
         protected override Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
             CapsuleRadius = Radius;

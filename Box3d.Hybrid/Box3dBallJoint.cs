@@ -25,11 +25,21 @@ namespace Box3d.Hybrid
         [SerializeField, Tooltip("Upper twist limit in degrees.")]
         private float MaxTwist = 45f;
 
+        [Header("Spring")]
+        [SerializeField] private bool UseSpring = true;
+        [SerializeField] private float SpringHertz = 3f;
+        [SerializeField] private float SpringDamping = 0.3f;
+
+        public void SetSpring(float hertz, float damping) { UseSpring = true; SpringHertz = hertz; SpringDamping = damping; if (NativeJoint.IsValid) { var j = new SphericalJoint { Id = NativeJoint.Id }; j.EnableSpring(true); j.SetSpringHertz(hertz); j.SetSpringDampingRatio(damping); } }
+        public void SetConeLimit(bool enable, float angle) { UseConeLimit = enable; ConeAngle = angle; if (NativeJoint.IsValid) { var j = new SphericalJoint { Id = NativeJoint.Id }; j.SetConeLimit(enable ? angle * Mathf.Deg2Rad : float.MaxValue); } }
+        public void SetTwistLimit(bool enable, float min, float max) { UseTwistLimit = enable; MinTwist = min; MaxTwist = max; if (NativeJoint.IsValid) { var j = new SphericalJoint { Id = NativeJoint.Id }; j.SetTwistLimits(enable ? min * Mathf.Deg2Rad : -float.MaxValue, enable ? max * Mathf.Deg2Rad : float.MaxValue); } }
+
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)
         {
             Vector3 worldAxis = transform.TransformDirection(Axis);
 
             SphericalJointDef def = SphericalJointDef.Default;
+            if (UseSpring) { def.EnableSpring = true; def.Hertz = SpringHertz; def.DampingRatio = SpringDamping; }
             SetupBase(ref def.Base, bodyA, bodyB, LocalAxisFrame(worldAxis));
 
             if (UseConeLimit)

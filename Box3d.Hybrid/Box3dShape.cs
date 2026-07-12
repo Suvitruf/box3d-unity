@@ -25,7 +25,7 @@ namespace Box3d.Hybrid
         protected Vector3 Center = Vector3.zero;
 
         [SerializeField, Tooltip("Is this shape a sensor (trigger)?")]
-        private bool IsSensor;
+        public bool IsSensor;
 
         [SerializeField, Tooltip("Enable sensor events for trigger-style detection.")]
         private bool EnableSensorEvents = true;
@@ -54,7 +54,7 @@ namespace Box3d.Hybrid
 
         private void Awake()
         {
-            if (GetComponentInParent<Box3dBody>()) return;
+            if (_shape.IsValid) return; // already attached by a body
 
             Box3dWorld world = Box3dWorld.Instance;
             world.EnsureCreated();
@@ -63,10 +63,21 @@ namespace Box3d.Hybrid
             def.Rotation = transform.rotation;
             _ownBody = world.World.CreateBody(def);
             AttachTo(_ownBody, float3.zero, quaternion.identity, transform.lossyScale);
+            Box3dWorld.Instance.RegisterStandaloneShape(this);
         }
+
+        internal void SyncTransform()
+        {
+            if (!_ownBody.IsValid) return;
+            _ownBody.SetTransform(transform.position, transform.rotation);
+        }
+
+        private void OnEnable() { if (_ownBody.IsValid) _ownBody.Enable(); }
+        private void OnDisable() { if (_ownBody.IsValid) _ownBody.Disable(); }
 
         private void OnDestroy()
         {
+            Box3dWorld.Instance.UnregisterStandaloneShape(this);
             if (_shape.IsValid)
             {
                 Box3dWorld.Instance.UnregisterShape(_shape.Id);
@@ -109,6 +120,8 @@ namespace Box3d.Hybrid
 
         internal void AttachTo(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
+            if (_ownBody.IsValid && _ownBody.Id.ToUInt64() != body.Id.ToUInt64())
+            { _ownBody.Destroy(); _ownBody = default; }
             _shape = CreateShape(body, localPosition, localRotation, scale);
             if (_shape.IsValid)
             {
@@ -130,8 +143,11 @@ namespace Box3d.Hybrid
         {
             var body = new Body { Id = _shape.GetBody() };
             var bodyPos = body.Position;
-            var localPt = math.mul(math.inverse(body.Rotation), (float3)point - bodyPos);
-            return ClosestPointLocal(localPt);
+            var bodyRot = body.Rotation;
+            var localPt = math.mul(math.inverse(bodyRot), (float3)point - bodyPos);
+            var localResult = ClosestPointLocal(localPt);
+            var worldResult = bodyPos + math.mul(bodyRot, (float3)localResult);
+            return worldResult;
         }
 
         protected virtual Vector3 ClosestPointLocal(float3 localPoint)
