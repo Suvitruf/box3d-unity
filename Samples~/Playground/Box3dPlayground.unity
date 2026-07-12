@@ -376,10 +376,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: db091954e31c4b7bbebdec06db1aae87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  DragHertz: 5
+  ExplosionRadius: 4
+  ExplosionImpulsePerArea: 3000
+  WorkerCount: 0
   BaseMaterial: {fileID: 2100000, guid: 0940296bc1df459095a387258a866971, type: 2}
-  Seed: 12345
-  WarmupSteps: 60
-  MeasureSteps: 600
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

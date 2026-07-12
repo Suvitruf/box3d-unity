@@ -42,6 +42,9 @@ This project was inspired by, and owes its architecture to, two projects:
 - **Diagnostics** — debug-draw overlay (shapes, contacts, forces, islands) toggled right on the
   `Box3dWorld` component; a drop-in stats HUD (step time, per-phase profile, live counts); and
   `World.GetProfile()` / `GetCounters()` for programmatic profiling.
+- **Determinism & replay** — record a simulation, verify it reproduces bit-identical state (even
+  across worker counts), save it, and scrub the replay frame by frame with divergence detection —
+  for lockstep/rollback netcode and bug repro. No other Unity physics wrapper ships this.
 - **Extras** — explosions, wind, conveyor surface materials.
 - **Multithreading** — box3d's internal scheduler, configurable worker count per world.
 - **Component layer (experimental)** — author bodies and shapes in the Inspector, mirroring
@@ -155,6 +158,7 @@ ones require the Input System package.
 - [Character mover](Documentation~/character-mover.md)
 - [Callbacks & threading](Documentation~/callbacks-and-threading.md)
 - [Debug draw](Documentation~/debug-draw.md)
+- [Determinism & replay](Documentation~/determinism-and-replay.md) — record, validate, and scrub replays
 - [Performance](Documentation~/performance.md)
 - [Building the native libraries](Documentation~/building-natives.md)
 

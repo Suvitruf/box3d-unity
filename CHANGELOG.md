@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0] — 2026-07-12
+
+### Added — determinism & replay
+- **Record / validate / replay** — capture a simulation and prove it reproduces bit-identical state,
+  the tooling for lockstep/rollback netcode, authoritative server physics, and reproducing
+  intermittent bugs. No other Unity physics wrapper ships this.
+- **`Box3dRecorder`**: a drop-in component that records the world and reports **`DETERMINISTIC`** /
+  **`DIVERGED`** — including a cross-thread option (replay at a different worker count) to verify
+  box3d reproduces identically regardless of thread count. Warns if the recorded world is empty.
+- **`Box3dReplayer`** + scrub timeline: plays back a `.rec` file (or live capture) in its own replay
+  world, debug-drawn, with an Inspector timeline (frame slider, transport, live divergence read-out).
+- **Low-level API**: `Recording` (Create / Save / Load / GetData / **ValidateReplay**),
+  `World.StartRecording` / `StopRecording`, and `ReplayPlayer` (StepFrame / SeekFrame / Restart,
+  HasDiverged / DivergeFrame, GetInfo, per-body access, the replayed `World`, and `EnableShapeDrawing`).
+- Documentation: [determinism & replay](Documentation~/determinism-and-replay.md).
+
 ## [0.5.0] — 2026-07-11
 
 ### Added — diagnostics & debug tooling

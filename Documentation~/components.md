@@ -117,6 +117,19 @@ Frames are computed so the joint is satisfied at the pose you built it in — cr
 the bodies. For the wheel joint, put it on the wheel and set Connected Body to the chassis; the
 suspension axis and spin (axle) axis are configurable.
 
+## Tooling components
+
+Drop-in components for diagnostics — all optional, none needed to simulate:
+
+| Component | Does |
+|---|---|
+| `Box3dStatsHud` | On-screen HUD: FPS, step time + per-phase breakdown, live body/contact/island counts, memory. |
+| `Box3dRecorder` | Records the world and checks **determinism** (with a cross-thread option); saves a `.rec`. |
+| `Box3dReplayer` | Plays back a `.rec` (or live capture) with a scrub **timeline** and divergence read-out. |
+
+See [debug draw](debug-draw.md) for the overlay and HUD, and
+[determinism & replay](determinism-and-replay.md) for the recorder/replayer.
+
 ## Current limits
 
 - Mesh shapes are static-only (use a hull shape for dynamic concave-ish objects). Hull and mesh
