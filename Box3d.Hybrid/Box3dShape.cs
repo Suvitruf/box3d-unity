@@ -15,7 +15,7 @@ namespace Box3d.Hybrid
         [SerializeField, Min(0f), Tooltip("Density in kg/m³ (mass = density × volume). Baked at creation.")]
         private float Density = 1000f;
 
-        [SerializeField, Range(0f, 1f), Tooltip("Coulomb friction coefficient.")]
+        [SerializeField, Min(0f), Tooltip("Coulomb friction coefficient.")]
         private float Friction = 0.6f;
 
         [SerializeField, Range(0f, 1f), Tooltip("Bounciness. Only applies above the world's restitution speed threshold (~1 m/s), so gentle settling never bounces.")]
@@ -73,6 +73,13 @@ namespace Box3d.Hybrid
         }
 
         private void OnEnable() { if (_ownBody.IsValid) _ownBody.Enable(); }
+
+        private void OnValidate()
+        {
+            if (!Application.isPlaying || !_shape.IsValid) return;
+            _shape.SetFriction(Friction);
+            _shape.SetRestitution(Restitution);
+        }
         private void OnDisable() { if (_ownBody.IsValid) _ownBody.Disable(); }
 
         private void OnDestroy()
