@@ -41,6 +41,14 @@
   past; it ignores collision with its attached bodies by default (filter joints; **Collide With
   Attached** re-enables it). Renders through a LineRenderer whose width follows the rope Radius.
 
+### Added — event id → wrapper resolution ([#2](https://github.com/Suvitruf/box3d-unity/issues/2))
+- **`new Body(id)` / `new Shape(id)` / `new Joint(id)`** — the documented way back into the wrapper
+  API from the raw ids that move/contact/sensor/joint events deliver. No parallel lookup table
+  needed: the wrappers are thin value types over the ids, so wrapping an id *is* the resolution.
+- **`World.TryGetBody` / `TryGetShape` / `TryGetJoint`** — the validated form: false for stale ids
+  and for ids belonging to a different world. New "[Resolving event ids](Documentation~/events.md)"
+  section in the events doc.
+
 ### Fixed
 - **Inspector edits now apply live during play** across the component layer: `Box3DWorld` gravity,
   shape friction/restitution/density and sphere/capsule size (mass is re-derived), and every
