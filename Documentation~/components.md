@@ -156,7 +156,9 @@ edit, and **▶ Simulate in Editor** animates it live. Then choose:
 
 - **Dynamic** (default): at runtime the rope becomes capsule segment bodies linked by ball joints.
   Ends attach to any `Box3DBody` found at the endpoints — the rope swings with them and tugs on
-  them — otherwise they pin to the world. The rope collides with the scene.
+  them — otherwise they pin to the world. The rope collides with the scene, but not with the
+  bodies it's attached to (the anchors sit at their surface, and contacts there would fight the
+  joints); enable **Collide With Attached** if you want it to drape over them.
 - **Baked** — press **Bake Current Shape**: the curve freezes (no simulation in game) with
   optional static capsule collision, cheap enough to scatter everywhere like Source 2's static
   cables. A rope set to Baked without ever baking settles once at startup. **Make Dynamic** reverts.

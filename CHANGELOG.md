@@ -34,8 +34,10 @@
   shows the settled hang live while editing (verlet preview under the world's gravity, draggable
   far-end handle, an editor **Simulate** toggle), then **Bake** freezes the curve into a static
   cable with optional static collision — or leave it **Dynamic** and it builds capsule segments +
-  ball joints at runtime, attaching to any `Box3DBody` at its endpoints. Renders through a
-  LineRenderer.
+  ball joints at runtime, attaching to any `Box3DBody` at its endpoints. Segments are continuous
+  (bullet) bodies honoring the layer collision matrix, so the rope reacts to everything it sweeps
+  past; it ignores collision with its attached bodies by default (filter joints; **Collide With
+  Attached** re-enables it). Renders through a LineRenderer whose width follows the rope Radius.
 
 ### Fixed
 - **Inspector edits now apply live during play** across the component layer: `Box3DWorld` gravity,

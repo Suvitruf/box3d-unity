@@ -74,7 +74,6 @@ namespace Box3D.Hybrid.Editor
             var go = new GameObject("Rope", typeof(LineRenderer), typeof(Box3DRope));
             var line = go.GetComponent<LineRenderer>();
             line.useWorldSpace = true;
-            line.widthMultiplier = 0.06f;
             line.numCapVertices = 4;
             line.numCornerVertices = 4;
             line.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Line.mat");

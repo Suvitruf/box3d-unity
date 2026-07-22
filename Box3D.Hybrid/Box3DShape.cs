@@ -118,7 +118,7 @@ namespace Box3D.Hybrid
 
         // Builds a box3d mask from Unity's layer collision matrix: bit L is set for every layer
         // this layer is allowed to collide with.
-        private static ulong CollisionMaskForLayer(int layer)
+        internal static ulong CollisionMaskForLayer(int layer)
         {
             ulong mask = 0;
             for (int other = 0; other < 32; other++)

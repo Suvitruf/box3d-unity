@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -46,11 +47,17 @@ namespace Box3D.Hybrid
         [SerializeField, Min(1f), Tooltip("Rope density in kg/m³ (Dynamic mode).")]
         private float Density = 500f;
 
+        [SerializeField, Range(0f, 1f), Tooltip("Segment friction — how much the rope grips what it touches or rests on.")]
+        private float Friction = 0.6f;
+
         [SerializeField, Tooltip("Attach the first segment to a Box3DBody on this object or its parents (otherwise pinned to the world).")]
         private bool AttachStartToBody = true;
 
         [SerializeField, Tooltip("Attach the last segment to a Box3DBody on End Point or its parents (otherwise pinned to the world).")]
         private bool AttachEndToBody = true;
+
+        [SerializeField, Tooltip("Let rope segments collide with the bodies the ends are attached to. Off (default): the rope ignores its attached bodies — the anchors sit at their surface, and contacts there fight the joints.")]
+        private bool CollideWithAttached;
 
         [SerializeField, Tooltip("Baked mode: add static capsule collision along the curve.")]
         private bool BakedCollision = true;
@@ -93,7 +100,7 @@ namespace Box3D.Hybrid
 
             _world = Box3DWorld.Instance;
             _bakedBody = _world.World.CreateBody(BodyDef.Default); // static, identity — capsules in world coords
-            ShapeDef def = ShapeDef.Default;
+            ShapeDef def = SegmentShapeDef();
             for (int i = 0; i < points.Length - 1; i++)
             {
                 _bakedBody.CreateCapsuleShape(def, new Capsule
@@ -125,10 +132,12 @@ namespace Box3D.Hybrid
                 bodyDef.Rotation = quaternion.LookRotationSafe(dir, new float3(0f, 1f, 0f));
                 bodyDef.LinearDamping = 0.1f;
                 bodyDef.AngularDamping = 0.5f;
+                // Thin, fast-moving segments tunnel through other objects without continuous
+                // collision — bullet mode keeps the rope reacting to everything it sweeps past.
+                bodyDef.IsBullet = true;
                 _segments[i] = _world.World.CreateBody(bodyDef);
 
-                ShapeDef shapeDef = ShapeDef.Default;
-                shapeDef.Density = Density;
+                ShapeDef shapeDef = SegmentShapeDef();
                 float cap = Mathf.Max(0.001f, _halfSegment - Radius);
                 _segments[i].CreateCapsuleShape(shapeDef, new Capsule
                 {
@@ -138,7 +147,7 @@ namespace Box3D.Hybrid
                 });
             }
 
-            var joints = new System.Collections.Generic.List<Joint>(Segments + 1);
+            var joints = new List<Joint>(Segments + 1);
 
             // Chain: each shared node links the +Z tip of one segment to the -Z tip of the next.
             for (int i = 1; i < Segments; i++)
@@ -153,8 +162,42 @@ namespace Box3D.Hybrid
             joints.Add(AttachEnd(_segments[0], new float3(0f, 0f, -_halfSegment), nodes[0], startBody, ref _startPin));
             joints.Add(AttachEnd(_segments[Segments - 1], new float3(0f, 0f, _halfSegment), nodes[Segments], endBody, ref _endPin));
 
+            // The attach joints already skip their own pair (collide-connected is off), but the
+            // rope's other segments would still hit the attached body — and the near-anchor ones
+            // spawn overlapping it, which fights the joints. Filter the whole rope against each
+            // attached body unless collision was explicitly requested.
+            if (!CollideWithAttached)
+            {
+                if (startBody) FilterAgainst(joints, startBody.Body, _segments[0]);
+                if (endBody) FilterAgainst(joints, endBody.Body, _segments[Segments - 1]);
+            }
+
             _joints = joints.ToArray();
             _renderPoints = new Vector3[Segments + 1];
+        }
+
+        // Same material/filter convention as Box3DShape: category from the GameObject's layer,
+        // mask from the layer collision matrix — so ropes honor Project Settings → Physics.
+        private ShapeDef SegmentShapeDef()
+        {
+            ShapeDef def = ShapeDef.Default;
+            def.Density = Density;
+            def.BaseMaterial.Friction = Friction;
+            def.Filter.CategoryBits = 1UL << gameObject.layer;
+            def.Filter.MaskBits = Box3DShape.CollisionMaskForLayer(gameObject.layer);
+            return def;
+        }
+
+        private void FilterAgainst(List<Joint> joints, Body attached, Body alreadyJointed)
+        {
+            foreach (Body segment in _segments)
+            {
+                if (segment.Equals(alreadyJointed)) continue;
+                FilterJointDef def = FilterJointDef.Default;
+                def.Base.BodyIdA = attached.Id;
+                def.Base.BodyIdB = segment.Id;
+                joints.Add(_world.World.CreateFilterJoint(def));
+            }
         }
 
         private Joint Link(Body a, float3 localA, Body b, float3 localB)
@@ -255,6 +298,7 @@ namespace Box3D.Hybrid
         {
             if (!_line) _line = GetComponent<LineRenderer>();
             _line.useWorldSpace = true;
+            _line.widthMultiplier = Radius * 2f; // the visual is exactly as thick as the collision
             _line.positionCount = worldPoints.Length;
             _line.SetPositions(worldPoints);
         }
