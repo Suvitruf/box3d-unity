@@ -8,6 +8,12 @@ namespace Box3D
     {
         public BodyId Id;
 
+        /// <summary>Wraps a body id — the way back into the wrapper API from ids delivered by
+        /// events (e.g. <see cref="BodyMoveEvent.BodyId"/>) or stored by user code. Cheap and
+        /// unchecked; test <see cref="IsValid"/>, or use <see cref="World.TryGetBody"/> for the
+        /// validated form.</summary>
+        public Body(BodyId id) => Id = id;
+
         public bool IsValid => UnsafeBindings.b3Body_IsValid(Id);
 
         public void Destroy()
