@@ -383,7 +383,7 @@ public class Box3dPlayground : MonoBehaviour
         RayResult result = _world.CastRayClosest(ray.origin, (float3)(ray.direction * 100f), QueryFilter.Default);
         if (!result.Hit) return;
 
-        Body hitBody = new Body { Id = new Shape { Id = result.ShapeId }.GetBody() };
+        Body hitBody = new Shape { Id = result.ShapeId }.GetBody();
         if (!hitBody.IsValid || hitBody.GetMassData().Mass <= 0f) return; // statics aren't draggable
 
         _grabDistance = math.distance((float3)ray.origin, result.Point);
@@ -482,7 +482,7 @@ public class Box3dPlayground : MonoBehaviour
     {
         var shape = new Shape { Id = shapeId };
         if (!shape.IsValid) return;
-        var body = new Body { Id = shape.GetBody() };
+        Body body = shape.GetBody();
         int index = (int)body.UserData;
         if (index >= 0 && index < _objects.Count && _objects[index].Body.Equals(body))
         {

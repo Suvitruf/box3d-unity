@@ -37,6 +37,12 @@ namespace Box3d
 
         public bool IsAwake => UnsafeBindings.b3Body_IsAwake(Id);
 
+        /// <summary>The body's simulation type (static / kinematic / dynamic).</summary>
+        public BodyType Type => UnsafeBindings.b3Body_GetType(Id);
+
+        /// <summary>Whether the body participates in simulation (disabled bodies don't collide or move).</summary>
+        public bool IsEnabled => UnsafeBindings.b3Body_IsEnabled(Id);
+
         /// <summary>Application-specific data attached to the body. Delivered back in
         /// <see cref="BodyMoveEvent.UserData"/> — the cheap transform-sync channel.</summary>
         public unsafe IntPtr UserData
@@ -44,6 +50,12 @@ namespace Box3d
             get => (IntPtr)UnsafeBindings.b3Body_GetUserData(Id);
             set => UnsafeBindings.b3Body_SetUserData(Id, (void*)value);
         }
+
+        /// <summary>Number of shapes attached to this body.</summary>
+        public int GetShapeCount() => UnsafeBindings.b3Body_GetShapeCount(Id);
+
+        /// <summary>Number of joints attached to this body.</summary>
+        public int GetJointCount() => UnsafeBindings.b3Body_GetJointCount(Id);
 
         /// <summary>Copies the ids of shapes attached to this body into the buffer.
         /// Returns the number written. Size the buffer with GetShapeCount().</summary>

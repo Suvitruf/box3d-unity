@@ -93,7 +93,7 @@ public class Box3dDragSandbox : MonoBehaviour
         RayResult result = _world.CastRayClosest(ray.origin, (float3)(ray.direction * 100f), QueryFilter.Default);
         if (!result.Hit) return;
 
-        Body hitBody = new Body { Id = new Shape { Id = result.ShapeId }.GetBody() };
+        Body hitBody = new Shape { Id = result.ShapeId }.GetBody();
         if (!hitBody.IsValid) return;
 
         _grabDistance = math.distance((float3)ray.origin, result.Point);

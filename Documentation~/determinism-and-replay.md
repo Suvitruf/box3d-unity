@@ -96,3 +96,6 @@ recording.Destroy();
 - **Networked physics** — verify lockstep/rollback determinism, including across worker counts.
 - **Bug repro** — capture a run that misbehaves and scrub to the exact frame it goes wrong.
 - **Regression tests** — `ValidateReplay` in a test asserts a scene stays deterministic.
+
+For hashing world state yourself and comparing across builds/machines (rather than validating one
+recording), see [determinism testing](determinism-testing.md).

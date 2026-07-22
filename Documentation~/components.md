@@ -127,6 +127,7 @@ Drop-in components for diagnostics — all optional, none needed to simulate:
 | `Box3dRecorder` | Records the world and checks **determinism** (with a cross-thread option); saves a `.rec`. |
 | `Box3dReplayer` | Plays back a `.rec` (or live capture) as **wireframes** with a scrub **timeline** and divergence read-out. |
 | `Box3dVisualReplayer` | Plays a `.rec` back on the scene's **real GameObjects** (same scene), mapped by body name. |
+| `Box3dDeterminismHarness` | Runs a fixed scenario and shows its state-hash on screen — build to Editor/Android/WebGL and compare. |
 
 See [debug draw](debug-draw.md) for the overlay and HUD, and
 [determinism & replay](determinism-and-replay.md) for the recorder/replayer.

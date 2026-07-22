@@ -50,7 +50,6 @@ namespace Box3d
         public bool IsSleepEnabled() => UnsafeBindings.b3Body_IsSleepEnabled(Id);
         public void SetSleepThreshold(float sleepThreshold) => UnsafeBindings.b3Body_SetSleepThreshold(Id, sleepThreshold);
         public float GetSleepThreshold() => UnsafeBindings.b3Body_GetSleepThreshold(Id);
-        public bool IsEnabled() => UnsafeBindings.b3Body_IsEnabled(Id);
         public void Disable() => UnsafeBindings.b3Body_Disable(Id);
         public void Enable() => UnsafeBindings.b3Body_Enable(Id);
         public void SetMotionLocks(MotionLocks locks) => UnsafeBindings.b3Body_SetMotionLocks(Id, locks);
@@ -61,8 +60,6 @@ namespace Box3d
         public bool IsContactRecyclingEnabled() => UnsafeBindings.b3Body_IsContactRecyclingEnabled(Id);
         public void EnableHitEvents(bool enableHitEvents) => UnsafeBindings.b3Body_EnableHitEvents(Id, enableHitEvents);
         public WorldId GetWorld() => UnsafeBindings.b3Body_GetWorld(Id);
-        public int GetShapeCount() => UnsafeBindings.b3Body_GetShapeCount(Id);
-        public int GetJointCount() => UnsafeBindings.b3Body_GetJointCount(Id);
         public int GetContactCapacity() => UnsafeBindings.b3Body_GetContactCapacity(Id);
         public B3Aabb ComputeAABB() => UnsafeBindings.b3Body_ComputeAABB(Id);
     }

@@ -8,9 +8,7 @@ namespace Box3d
     public partial struct Shape
     {
         public ShapeType GetShapeType() => UnsafeBindings.b3Shape_GetType(Id);
-        public BodyId GetBody() => UnsafeBindings.b3Shape_GetBody(Id);
         public WorldId GetWorld() => UnsafeBindings.b3Shape_GetWorld(Id);
-        public bool IsSensor() => UnsafeBindings.b3Shape_IsSensor(Id);
         public void SetDensity(float density, bool updateBodyMass) => UnsafeBindings.b3Shape_SetDensity(Id, density, updateBodyMass);
         public float GetDensity() => UnsafeBindings.b3Shape_GetDensity(Id);
         public void SetFriction(float friction) => UnsafeBindings.b3Shape_SetFriction(Id, friction);
@@ -22,8 +20,6 @@ namespace Box3d
         public int GetMeshMaterialCount() => UnsafeBindings.b3Shape_GetMeshMaterialCount(Id);
         public void SetMeshMaterial(SurfaceMaterial surfaceMaterial, int index) => UnsafeBindings.b3Shape_SetMeshMaterial(Id, surfaceMaterial, index);
         public SurfaceMaterial GetMeshSurfaceMaterial(int index) => UnsafeBindings.b3Shape_GetMeshSurfaceMaterial(Id, index);
-        public CollisionFilter GetFilter() => UnsafeBindings.b3Shape_GetFilter(Id);
-        public void SetFilter(CollisionFilter filter, bool invokeContacts) => UnsafeBindings.b3Shape_SetFilter(Id, filter, invokeContacts);
         public void EnableSensorEvents(bool flag) => UnsafeBindings.b3Shape_EnableSensorEvents(Id, flag);
         public bool AreSensorEventsEnabled() => UnsafeBindings.b3Shape_AreSensorEventsEnabled(Id);
         public void EnableContactEvents(bool flag) => UnsafeBindings.b3Shape_EnableContactEvents(Id, flag);
@@ -36,7 +32,6 @@ namespace Box3d
         public Capsule GetCapsule() => UnsafeBindings.b3Shape_GetCapsule(Id);
         public int GetContactCapacity() => UnsafeBindings.b3Shape_GetContactCapacity(Id);
         public int GetSensorCapacity() => UnsafeBindings.b3Shape_GetSensorCapacity(Id);
-        public B3Aabb GetAABB() => UnsafeBindings.b3Shape_GetAABB(Id);
         public MassData ComputeMassData() => UnsafeBindings.b3Shape_ComputeMassData(Id);
         public Unity.Mathematics.float3 GetClosestPoint(Unity.Mathematics.float3 target) => UnsafeBindings.b3Shape_GetClosestPoint(Id, target);
         public void ApplyWind(Unity.Mathematics.float3 wind, float drag, float lift, float maxSpeed, bool wake) => UnsafeBindings.b3Shape_ApplyWind(Id, wind, drag, lift, maxSpeed, wake);

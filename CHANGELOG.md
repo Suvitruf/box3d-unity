@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.6.2] — 2026-07-22
+
+### Added
+- **Determinism state hashing** — `Determinism.HashState(bodies)` / `Determinism.Hash(bytes)` wrap
+  box3d's own state hash, giving lockstep/rollback games a per-step checksum to exchange and compare.
+  Ships with an example lockstep test and a new doc:
+  [determinism testing](Documentation~/determinism-testing.md).
+- **`Box3dDeterminismHarness`** — a cross-platform determinism probe: build the same seeded scene to
+  Editor (x64/Mono), Android (arm64/IL2CPP) and WebGL (WASM), and compare the on-screen hash
+  signature (platform/backend + checkpoints at 25/50/75%/final) to see whether box3d's floating-point
+  results match across platforms.
+- **Collision Debugger** (Window ▸ Box3d ▸ Collision Debugger) — assign two `Box3dBody` and get a
+  rule-by-rule verdict of why they aren't colliding: body types, enabled state, joint
+  Collide Connected, category/mask/group filters, sensors, and broadphase-AABB proximity — mirroring
+  box3d's own collision rules. The logic is reusable at runtime via `CollisionDiagnostics.Diagnose`.
+- New managed accessors: `Shape.GetFilter` / `SetFilter` / `IsSensor` / `GetAABB` / `GetBody`,
+  `Body.Type` / `IsEnabled` / `GetShapeCount` / `GetJointCount`,
+  `Joint.BodyA` / `BodyB` / `CollideConnected`.
+
+### Changed
+- `Shape.GetBody()` now returns a `Body` (previously the raw `BodyId`).
+- `Body.IsEnabled` is now a property (previously a generated `IsEnabled()` method).
+
 ## [0.6.1] — 2026-07-13
 
 ### Added

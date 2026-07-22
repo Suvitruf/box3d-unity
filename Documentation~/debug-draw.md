@@ -53,6 +53,21 @@ Numbers to go with the geometry:
 - **`TreeStats`** — every ray/overlap/cast has an `out TreeStats` overload reporting how many
   broadphase nodes the query visited (its spatial cost).
 
+## Collision debugger ("why isn't this colliding?")
+
+**Window ▸ Box3d ▸ Collision Debugger** answers the most common physics question. Assign two
+`Box3dBody` objects, enter Play mode, and it gives a rule-by-rule verdict — the same rules the engine
+uses:
+
+- **body types** — a static/kinematic pair never collides (at least one must be dynamic);
+- **enabled** — disabled bodies don't collide;
+- **joints** — a joint between them with *Collide Connected* off suppresses it;
+- **collision filters** — category/mask both ways, and group-index overrides, with the exact bits that
+  fail spelled out;
+- **sensor** and **AABB proximity** notes (whether they're even near each other right now).
+
+The rule logic lives in `CollisionDiagnostics` if you want to run it from your own code.
+
 ## Limitations
 
 - Triangle meshes, height fields, and compounds don't draw their full wireframe (a terrain would
