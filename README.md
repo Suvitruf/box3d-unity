@@ -165,6 +165,22 @@ ones require the Input System package.
 - [Performance](Documentation~/performance.md)
 - [Building the native libraries](Documentation~/building-natives.md)
 
+## Support & community
+
+**Join on [Discord](https://discord.gg/3aDtVmNRMY)** — chat about the project, follow progress, ask
+questions, share ideas, or help test. Everyone curious about Box3D or physics in Unity is welcome.
+
+**Support development** — this is a free, open-source labour of love built in spare time. If you'd
+like to help it move along faster, you can support me on
+[Patreon](https://www.patreon.com/apanasik). Entirely optional — it funds the time spent on the
+bindings and tooling; the package stays free and MIT either way.
+
+## Contributors
+
+- [timskap](https://github.com/timskap) — Editor and tooling: the GameObject creation menu,
+  component icons, inspectors and the rope editor workflow. Mostly focused on making the package
+  more convenient to use in the editor.
+
 ## License
 
 MIT (see [LICENSE](LICENSE)). Box3D itself is MIT, © Erin Catto.
