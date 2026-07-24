@@ -8,8 +8,10 @@
 //
 // Buffer conventions:
 //   _Positions[i].xyz  world position, .w  1 = alive, 0 = dead slot
+//   _Velocities[i].xyz velocity, .w  foam amount in [0, 1] (whitewater accumulator)
 //   _Predicted[i]      candidate position being relaxed by the constraint iterations
 //   _Scratch           per-stage float4 scratch (position deltas, then raw velocities)
+//   _Densities[i]      local density / rest density from the last constraint solve
 
 #pragma kernel ClearGrid
 #pragma kernel Predict
@@ -32,6 +34,7 @@ RWStructuredBuffer<float4> _Velocities;
 RWStructuredBuffer<float4> _Predicted;
 RWStructuredBuffer<float4> _Scratch;
 RWStructuredBuffer<float>  _Lambdas;
+RWStructuredBuffer<float>  _Densities;
 RWStructuredBuffer<uint>   _GridHead;
 RWStructuredBuffer<uint>   _GridNext;
 RWStructuredBuffer<int>    _BodyImpulses; // per body: jx jy jz tx ty tz contacts pad (8 ints)
@@ -74,6 +77,7 @@ cbuffer Params
     uint   _Contain;          // 1 = solid walls at bounds, 0 = open (kill below floor)
     float  _CouplingScale;    // scales impulses handed back to rigid bodies
     float  _MaxSpeed;         // CFL clamp
+    float  _FoamDecay;        // per-substep foam retain factor
 }
 
 // ---------------------------------------------------------------- kernels & helpers
@@ -194,7 +198,9 @@ void SolveLambda(uint3 id : SV_DispatchThreadID)
     })
 
     // Only compression is corrected; tensile pull comes from the cohesion term instead.
-    float c = max(density / _RestDensity - 1.0, 0.0);
+    float normalized = density / _RestDensity;
+    _Densities[i] = normalized; // aeration signal for foam (low = surface / spray / impact)
+    float c = max(normalized - 1.0, 0.0);
     sumGrad2 += dot(gradI, gradI);
     _Lambdas[i] = -c / (sumGrad2 + 1.0e-1);
 }
@@ -399,6 +405,14 @@ void Finalize(uint3 id : SV_DispatchThreadID)
         })
     }
 
-    _Velocities[i] = float4(vi + _Viscosity * dv, 0.0);
+    float3 v = vi + _Viscosity * dv;
+
+    // Whitewater: aerated (under-dense) particles moving fast churn into foam, which then
+    // decays back to clear water. Lives in velocity.w so renderers get it for free.
+    float aeration = saturate((1.0 - _Densities[i]) * 2.5);
+    float churn = aeration * smoothstep(1.5, 4.0, length(v));
+    float foam = max(_Velocities[i].w * _FoamDecay, churn);
+
+    _Velocities[i] = float4(v, foam);
     _Positions[i] = float4(pi.xyz, 1.0);
 }

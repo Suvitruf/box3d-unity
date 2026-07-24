@@ -90,6 +90,12 @@ namespace Box3D.Hybrid
         [SerializeField, Range(0f, 2f), Tooltip("Surface smoothing. 0 shows the raw particle blobs; higher melts them into one continuous sheet.")]
         private float Smoothing = 1f;
 
+        [SerializeField, Range(0f, 1f), Tooltip("Whitewater strength. Fast, aerated water (splashes, impacts, waterfalls) churns into foam, plus a foam rim where objects pierce the surface.")]
+        private float Foam = 0.5f;
+
+        [SerializeField, Range(0.01f, 0.5f), Tooltip("How softly the water blends into objects and shores it touches, in meters. Small = crisp waterline, large = misty fade.")]
+        private float ShoreBlend = 0.12f;
+
         [SerializeField, Range(1f, 3f), Tooltip("Visual size of each particle relative to its physical radius. Larger overlaps neighbours into a closed surface.")]
         private float ParticleRenderScale = 1.8f;
 
@@ -113,6 +119,7 @@ namespace Box3D.Hybrid
         private ComputeBuffer _predicted;
         private ComputeBuffer _scratch;
         private ComputeBuffer _lambdas;
+        private ComputeBuffer _densities;
         private ComputeBuffer _gridHead;
         private ComputeBuffer _gridNext;
         private ComputeBuffer _colliders;
@@ -160,6 +167,10 @@ namespace Box3D.Hybrid
         /// <summary>The particle slots currently in use (upper bound on alive particles).</summary>
         public int ActiveParticleRange => _activeRange;
 
+        /// <summary>The live velocity buffer (float4: xyz velocity, w = foam amount in [0, 1]),
+        /// for custom renderers. Null until the simulation starts.</summary>
+        public ComputeBuffer VelocityBuffer => _velocities;
+
         /// <summary>Radius of one fluid particle in meters.</summary>
         public float Radius => ParticleRadius;
 
@@ -173,6 +184,8 @@ namespace Box3D.Hybrid
         internal float SurfaceAbsorption => Absorption;
         internal float SurfaceRefraction => Refraction;
         internal float SurfaceReflection => Reflection;
+        internal float SurfaceFoam => Foam;
+        internal float SurfaceShoreBlend => ShoreBlend;
         internal float SmoothingWorldRadius => SmoothingRadius;
 
         private void OnEnable()
@@ -233,6 +246,7 @@ namespace Box3D.Hybrid
             _predicted = new ComputeBuffer(_capacity, 16);
             _scratch = new ComputeBuffer(_capacity, 16);
             _lambdas = new ComputeBuffer(_capacity, 4);
+            _densities = new ComputeBuffer(_capacity, 4);
             _gridHead = new ComputeBuffer(HashSize, 4);
             _gridNext = new ComputeBuffer(_capacity, 4);
             _colliders = new ComputeBuffer(MaxColliders, 112);
@@ -250,6 +264,7 @@ namespace Box3D.Hybrid
                 _compute.SetBuffer(kernel, "_Predicted", _predicted);
                 _compute.SetBuffer(kernel, "_Scratch", _scratch);
                 _compute.SetBuffer(kernel, "_Lambdas", _lambdas);
+                _compute.SetBuffer(kernel, "_Densities", _densities);
                 _compute.SetBuffer(kernel, "_GridHead", _gridHead);
                 _compute.SetBuffer(kernel, "_GridNext", _gridNext);
                 _compute.SetBuffer(kernel, "_Colliders", _colliders);
@@ -264,6 +279,7 @@ namespace Box3D.Hybrid
             _predicted?.Release(); _predicted = null;
             _scratch?.Release(); _scratch = null;
             _lambdas?.Release(); _lambdas = null;
+            _densities?.Release(); _densities = null;
             _gridHead?.Release(); _gridHead = null;
             _gridNext?.Release(); _gridNext = null;
             _colliders?.Release(); _colliders = null;
@@ -394,6 +410,7 @@ namespace Box3D.Hybrid
             _compute.SetInt("_Contain", Contain ? 1 : 0);
             _compute.SetFloat("_CouplingScale", TwoWayCoupling ? CouplingStrength : 0f);
             _compute.SetFloat("_MaxSpeed", h / dt);
+            _compute.SetFloat("_FoamDecay", Mathf.Exp(-1.1f * dt));
 
             _bodyImpulses.SetData(_impulseClear);
 

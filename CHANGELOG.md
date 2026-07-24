@@ -17,6 +17,12 @@
   live particle count, pipeline-setting warnings. Scripting: `SpawnParticles` (recycling
   emitters), `Fill`, `Clear`, and `ParticleBuffer`/`ActiveParticleRange` for custom renderers.
   See `Documentation~/water.md`.
+- **Water foam & shoreline merging**: the fluid solver tracks per-particle whitewater (aerated
+  fast water churns into foam and decays back), rendered as a depth-tested foam pass with a
+  noise-broken foam rim at every waterline; water now melts softly into geometry it touches
+  (**Shore Blend**) instead of a hard depth cut, with refraction relaxing to zero at the edge.
+  New **Foam** and **Shore Blend** sliders on `Box3DWater`; foam ships to custom renderers in
+  `VelocityBuffer` (w channel).
 - **`Box3DWaterfall`** (Add Component → Box3D → Waterfall, GameObject → Box3D → Waterfall): a
   continuous emitter pouring particles from a rectangular lip along its forward axis — waterfall,
   fountain or spout depending on how it's aimed. Selecting it previews the gravity flight arc in

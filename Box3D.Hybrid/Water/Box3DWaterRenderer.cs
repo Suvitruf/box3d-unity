@@ -16,6 +16,7 @@ namespace Box3D.Hybrid
         {
             public RenderTexture Depth;
             public RenderTexture Thickness;
+            public RenderTexture Foam;
             public RenderTexture BlurTmp;
         }
 
@@ -106,6 +107,7 @@ namespace Box3D.Hybrid
         {
             if (t.Depth) t.Depth.Release();
             if (t.Thickness) t.Thickness.Release();
+            if (t.Foam) t.Foam.Release();
             if (t.BlurTmp) t.BlurTmp.Release();
         }
 
@@ -124,6 +126,7 @@ namespace Box3D.Hybrid
 
             _cmd.Clear();
             _cmd.SetGlobalBuffer("_Box3DWaterPositions", _water.ParticleBuffer);
+            _cmd.SetGlobalBuffer("_Box3DWaterVelocities", _water.VelocityBuffer);
             _cmd.SetGlobalMatrix("_Box3DWaterView", view);
             _cmd.SetGlobalMatrix("_Box3DWaterProj", gpuProj);
             _cmd.SetGlobalFloat("_Box3DWaterRenderRadius", _water.RenderRadius);
@@ -138,6 +141,14 @@ namespace Box3D.Hybrid
             _cmd.SetRenderTarget(targets.Thickness);
             _cmd.ClearRenderTarget(false, true, Color.clear);
             _cmd.DrawProcedural(Matrix4x4.identity, _particleMat, 1, MeshTopology.Triangles, range * 6);
+
+            // Whitewater splats, z-tested against the impostor depth so only surface foam shows.
+            _cmd.SetRenderTarget(targets.Foam, targets.Depth);
+            _cmd.ClearRenderTarget(false, true, Color.clear);
+            if (_water.SurfaceFoam > 0f)
+            {
+                _cmd.DrawProcedural(Matrix4x4.identity, _particleMat, 2, MeshTopology.Triangles, range * 6);
+            }
 
             // Bilateral smoothing: melt sphere depths into one surface without crossing silhouettes.
             if (_water.SurfaceSmoothing > 0f)
@@ -164,6 +175,7 @@ namespace Box3D.Hybrid
             Matrix4x4 proj = camera.projectionMatrix;
             _surfaceMat.SetTexture("_Box3DWaterDepthTex", targets.Depth);
             _surfaceMat.SetTexture("_Box3DWaterThickTex", targets.Thickness);
+            _surfaceMat.SetTexture("_Box3DWaterFoamTex", targets.Foam);
             _surfaceMat.SetMatrix("_Box3DWaterCamToWorld", camera.cameraToWorldMatrix);
             _surfaceMat.SetVector("_Box3DWaterProjExtents", new Vector4(1f / proj[0, 0], 1f / proj[1, 1], 0f, 0f));
             PushSurfaceLook();
@@ -181,6 +193,9 @@ namespace Box3D.Hybrid
         private void PushSurfaceLook()
         {
             _surfaceMat.SetColor("_TintColor", _water.SurfaceColor);
+            _surfaceMat.SetFloat("_FoamStrength", _water.SurfaceFoam);
+            _surfaceMat.SetFloat("_ShoreBlend", _water.SurfaceShoreBlend);
+            _surfaceMat.SetFloat("_Box3DWaterTime", Time.time);
             _surfaceMat.SetFloat("_AbsorptionScale", _water.SurfaceAbsorption);
             _surfaceMat.SetFloat("_RefractionStrength", _water.SurfaceRefraction * 0.15f);
             _surfaceMat.SetFloat("_ReflectionStrength", _water.SurfaceReflection);
@@ -221,6 +236,10 @@ namespace Box3D.Hybrid
                 t.Thickness = new RenderTexture(width, height, 0, RenderTextureFormat.RHalf)
                 {
                     name = "Box3DWaterThickness", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
+                };
+                t.Foam = new RenderTexture(width, height, 0, RenderTextureFormat.RHalf)
+                {
+                    name = "Box3DWaterFoam", filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp,
                 };
                 t.BlurTmp = new RenderTexture(width, height, 0, RenderTextureFormat.RFloat)
                 {

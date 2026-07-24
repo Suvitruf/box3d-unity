@@ -36,6 +36,22 @@ Shader "Hidden/Box3D/WaterParticles"
             #include "Box3DWaterParticles.hlsl"
             ENDHLSL
         }
+
+        Pass // 2: foam (bound with the depth pass's z-buffer)
+        {
+            ZWrite Off
+            ZTest LEqual
+            Cull Off
+            Blend One One
+            ColorMask R
+
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma vertex Vert
+            #pragma fragment FragFoam
+            #include "Box3DWaterParticles.hlsl"
+            ENDHLSL
+        }
     }
     Fallback Off
 }

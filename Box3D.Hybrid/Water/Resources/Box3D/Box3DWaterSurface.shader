@@ -43,6 +43,7 @@ Shader "Box3D/Water Surface"
             Texture2D _Box3DWaterDepthTex;   SamplerState sampler_Box3DWaterDepthTex;
             float4 _Box3DWaterDepthTex_TexelSize;
             Texture2D _Box3DWaterThickTex;   SamplerState sampler_Box3DWaterThickTex;
+            Texture2D _Box3DWaterFoamTex;    SamplerState sampler_Box3DWaterFoamTex;
 
             // Pipeline-provided globals.
             Texture2D _CameraDepthTexture;   SamplerState sampler_CameraDepthTexture;
@@ -66,6 +67,25 @@ Shader "Box3D/Water Surface"
             float _ReflectionBlur;
             float _SpecPower;
             float _SpecIntensity;
+            float _FoamStrength;
+            float _ShoreBlend;          // meters of soft fade where water meets geometry
+            float _Box3DWaterTime;
+
+            float Hash21(float2 p)
+            {
+                p = frac(p * float2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return frac(p.x * p.y);
+            }
+
+            float ValueNoise(float2 p)
+            {
+                float2 i = floor(p);
+                float2 f = frac(p);
+                f = f * f * (3.0 - 2.0 * f);
+                return lerp(lerp(Hash21(i), Hash21(i + float2(1, 0)), f.x),
+                            lerp(Hash21(i + float2(0, 1)), Hash21(i + float2(1, 1)), f.x), f.y);
+            }
 
             struct Varyings
             {
@@ -157,14 +177,30 @@ Shader "Box3D/Water Surface"
                 float3 specular = pow(saturate(dot(nWorld, halfDir)), _SpecPower)
                                   * _SpecIntensity * _MainLightColor.rgb;
 
+                // How far behind the water surface the scene sits: 0 right at a waterline (an
+                // object or shore piercing the surface), 1 in open water. Drives both the soft
+                // merge into geometry and the foam rim that hugs the intersection.
+                float shore = saturate((sceneEye - eyeDepth) / max(_ShoreBlend, 1e-3));
+
+                // Whitewater: churned foam splatted by the particles + the waterline rim,
+                // broken up by two octaves of drifting noise (coverage-threshold style).
+                float churn = _Box3DWaterFoamTex.SampleLevel(sampler_Box3DWaterFoamTex, uv, 0).r;
+                float cover = saturate(churn * 1.2 + (1.0 - shore) * 0.8) * _FoamStrength;
+                float noise = 0.55 * ValueNoise(worldPos.xz * 6.0 + _Box3DWaterTime * 0.35)
+                            + 0.45 * ValueNoise(worldPos.xz * 15.0 - _Box3DWaterTime * 0.6);
+                float foam = smoothstep(1.0 - cover, 1.0 - cover + 0.3, noise) * saturate(cover * 2.0);
+                float3 foamColor = _MainLightColor.rgb * 0.85 + 0.25;
+
                 float3 color;
                 float alpha;
             #if defined(_BOX3D_WATER_REFRACTION)
-                float2 refrUv = uv + nView.xy * _RefractionStrength * saturate(thickness);
+                // Refraction relaxes to zero at the waterline so edges don't wobble.
+                float2 refrUv = uv + nView.xy * _RefractionStrength * saturate(thickness) * shore;
                 float refrRaw = _CameraDepthTexture.SampleLevel(sampler_CameraDepthTexture, refrUv, 0).r;
                 if (LinearEye(refrRaw) < eyeDepth) refrUv = uv; // don't refract foreground objects in
                 float3 scene = _CameraOpaqueTexture.SampleLevel(sampler_CameraOpaqueTexture, refrUv, 0).rgb;
                 color = lerp(scene * transmit, reflection, fresnel * _ReflectionStrength) + specular;
+                color = lerp(scene, color, shore); // melt into whatever the water touches
                 alpha = 1.0;
             #else
                 // No opaque texture available: approximate transmission with alpha blending.
@@ -172,6 +208,12 @@ Shader "Box3D/Water Surface"
                         + specular;
                 alpha = saturate(1.0 - (transmit.r + transmit.g + transmit.b) / 3.0);
                 alpha = max(alpha, fresnel * _ReflectionStrength);
+                alpha *= shore; // fade out instead of a hard cut against geometry
+            #endif
+
+                color = lerp(color, foamColor, foam);
+            #if !defined(_BOX3D_WATER_REFRACTION)
+                alpha = max(alpha, foam * 0.9);
             #endif
 
                 return float4(color, alpha);
