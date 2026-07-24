@@ -44,6 +44,35 @@ namespace Box3D
 
         public bool IsValid => UnsafeBindings.b3World_IsValid(Id);
 
+        /// <summary>Resolves a body id (e.g. from <see cref="BodyMoveEvent"/>) to a live wrapper.
+        /// False if the id is stale (body destroyed) or belongs to a different world. For ids taken
+        /// straight from this world's current event stream, <c>new Body(id)</c> is the cheap
+        /// unchecked path.</summary>
+        public bool TryGetBody(BodyId id, out Body body)
+        {
+            body = new Body(id);
+            return body.IsValid && body.GetWorld().Equals(Id);
+        }
+
+        /// <summary>Resolves a shape id (e.g. from a contact/sensor event or query result) to a
+        /// live wrapper. False if the id is stale or belongs to a different world. For ids taken
+        /// straight from this world's current event stream, <c>new Shape(id)</c> is the cheap
+        /// unchecked path.</summary>
+        public bool TryGetShape(ShapeId id, out Shape shape)
+        {
+            shape = new Shape(id);
+            return shape.IsValid && shape.GetWorld().Equals(Id);
+        }
+
+        /// <summary>Resolves a joint id (e.g. from <see cref="JointEvent"/>) to a live wrapper.
+        /// False if the id is stale or belongs to a different world. For ids taken straight from
+        /// this world's current event stream, <c>new Joint(id)</c> is the cheap unchecked path.</summary>
+        public bool TryGetJoint(JointId id, out Joint joint)
+        {
+            joint = new Joint(id);
+            return joint.IsValid && joint.GetWorld().Equals(Id);
+        }
+
         /// <summary>Advances the simulation. Use a fixed timeStep (e.g. Time.fixedDeltaTime);
         /// 4 sub-steps is the recommended default.</summary>
         public void Step(float timeStep, int subStepCount = 4)

@@ -7,6 +7,12 @@ namespace Box3D
     {
         public ShapeId Id;
 
+        /// <summary>Wraps a shape id — the way back into the wrapper API from ids delivered by
+        /// events (e.g. <see cref="ContactBeginTouchEvent.ShapeIdA"/>) or query results. Cheap and
+        /// unchecked; test <see cref="IsValid"/>, or use <see cref="World.TryGetShape"/> for the
+        /// validated form.</summary>
+        public Shape(ShapeId id) => Id = id;
+
         public bool IsValid => UnsafeBindings.b3Shape_IsValid(Id);
 
         public void Destroy(bool updateBodyMass = true)

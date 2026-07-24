@@ -437,6 +437,7 @@ MonoBehaviour:
   LinearDamping: 0
   AngularDamping: 0.05
   StartAwake: 1
+  AllowFastRotation: 0
 --- !u!114 &200006
 MonoBehaviour:
   m_ObjectHideFlags: 0

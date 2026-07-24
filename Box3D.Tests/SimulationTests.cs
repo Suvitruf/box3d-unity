@@ -86,5 +86,37 @@ namespace Box3D.Tests
         {
             return new Body { Id = id }.IsValid;
         }
+
+        [Test]
+        public void Ids_ResolveBackToWrappers()
+        {
+            World world = World.Create(WorldDef.Default);
+            World other = World.Create(WorldDef.Default);
+
+            BodyDef bodyDef = BodyDef.Default;
+            bodyDef.Type = BodyType.Dynamic;
+            Body body = world.CreateBody(bodyDef);
+            Shape shape = body.CreateSphereShape(ShapeDef.Default, new Sphere { Radius = 0.5f });
+
+            // Unchecked wrapping: an id (as events deliver them) round-trips to a working wrapper.
+            Assert.IsTrue(new Body(body.Id).IsValid);
+            Assert.AreEqual(body, new Shape(shape.Id).GetBody());
+
+            // Validated resolution: owning world succeeds, another world rejects the same id.
+            Assert.IsTrue(world.TryGetBody(body.Id, out Body resolvedBody));
+            Assert.AreEqual(body, resolvedBody);
+            Assert.IsTrue(world.TryGetShape(shape.Id, out Shape resolvedShape));
+            Assert.AreEqual(shape, resolvedShape);
+            Assert.IsFalse(other.TryGetBody(body.Id, out _), "a foreign world must not resolve the id");
+
+            // Stale ids fail both paths after destroy.
+            BodyId stale = body.Id;
+            body.Destroy();
+            Assert.IsFalse(new Body(stale).IsValid);
+            Assert.IsFalse(world.TryGetBody(stale, out _));
+
+            other.Destroy();
+            world.Destroy();
+        }
     }
 }

@@ -259,11 +259,14 @@ namespace Box3D.Hybrid
         {
             if (_segments == null) return;
 
-            for (int i = 0; i < Segments; i++)
+            // _segments.Length, not Segments: the serialized field can be edited during play,
+            // but the built chain keeps its creation-time size.
+            int count = _segments.Length;
+            for (int i = 0; i < count; i++)
             {
                 _renderPoints[i] = SegmentTip(_segments[i], -_halfSegment);
             }
-            _renderPoints[Segments] = SegmentTip(_segments[Segments - 1], _halfSegment);
+            _renderPoints[count] = SegmentTip(_segments[count - 1], _halfSegment);
             ApplyToLine(_renderPoints);
         }
 

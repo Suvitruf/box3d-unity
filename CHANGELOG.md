@@ -48,12 +48,43 @@
   no grabbing through walls), **Esc** stops. Settled poses land on the real Transforms as a
   **single undo step**, with prefab-instance overrides recorded.
 
+### Added — event id → wrapper resolution ([#2](https://github.com/Suvitruf/box3d-unity/issues/2))
+- **`new Body(id)` / `new Shape(id)` / `new Joint(id)`** — the documented way back into the wrapper
+  API from the raw ids that move/contact/sensor/joint events deliver. No parallel lookup table
+  needed: the wrappers are thin value types over the ids, so wrapping an id *is* the resolution.
+- **`World.TryGetBody` / `TryGetShape` / `TryGetJoint`** — the validated form: false for stale ids
+  and for ids belonging to a different world. New "[Resolving event ids](Documentation~/events.md)"
+  section in the events doc.
+
 ### Fixed
 - **Inspector edits now apply live during play** across the component layer: `Box3DWorld` gravity,
   shape friction/restitution/density and sphere/capsule size (mass is re-derived), and every
   joint's limits, motor and spring parameters — `OnValidate` pushes them to the native objects,
   matching `Box3DBody` which already did this. Creation-baked state still can't change on a live
   object: box/hull/mesh geometry, joint axes/anchors/connected bodies, and the world's worker count.
+
+## [0.6.2] — 2026-07-22
+
+### Added
+- **Determinism state hashing** — `Determinism.HashState(bodies)` / `Determinism.Hash(bytes)` wrap
+  box3d's own state hash, giving lockstep/rollback games a per-step checksum to exchange and compare.
+  Ships with an example lockstep test and a new doc:
+  [determinism testing](Documentation~/determinism-testing.md).
+- **`Box3DDeterminismHarness`** — a cross-platform determinism probe: build the same seeded scene to
+  Editor (x64/Mono), Android (arm64/IL2CPP) and WebGL (WASM), and compare the on-screen hash
+  signature (platform/backend + checkpoints at 25/50/75%/final) to see whether box3d's floating-point
+  results match across platforms.
+- **Collision Debugger** (Window ▸ Box3D ▸ Collision Debugger) — assign two `Box3DBody` and get a
+  rule-by-rule verdict of why they aren't colliding: body types, enabled state, joint
+  Collide Connected, category/mask/group filters, sensors, and broadphase-AABB proximity — mirroring
+  box3d's own collision rules. The logic is reusable at runtime via `CollisionDiagnostics.Diagnose`.
+- New managed accessors: `Shape.GetFilter` / `SetFilter` / `IsSensor` / `GetAABB` / `GetBody`,
+  `Body.Type` / `IsEnabled` / `GetShapeCount` / `GetJointCount`,
+  `Joint.BodyA` / `BodyB` / `CollideConnected`.
+
+### Changed
+- `Shape.GetBody()` now returns a `Body` (previously the raw `BodyId`).
+- `Body.IsEnabled` is now a property (previously a generated `IsEnabled()` method).
 
 ## [0.6.1] — 2026-07-13
 

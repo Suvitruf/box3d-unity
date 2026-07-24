@@ -113,7 +113,7 @@ namespace Box3D.Hybrid.Editor
         {
             GameObjectUtility.SetParentAndAlign(go, command.context as GameObject);
             if (!go.transform.parent) StageUtility.PlaceGameObjectInCurrentStage(go);
-            go.name = GameObjectUtility.GetUniqueNameForSibling(go.transform.parent, go.name);
+            GameObjectUtility.EnsureUniqueNameForSibling(go); // excludes self — plain GetUniqueNameForSibling would rename the first "Box" to "Box (1)"
             Undo.RegisterCreatedObjectUndo(go, undoName);
             Selection.activeGameObject = go;
         }

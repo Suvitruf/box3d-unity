@@ -74,7 +74,7 @@ namespace Box3D.Hybrid.Editor
             foreach (ContactData c in body.GetContacts())
             {
                 // Anchor A is relative to shape A's body's center of mass (box3d picks the A/B order).
-                var bodyA = new Body { Id = c.ShapeA.GetBody() };
+                Body bodyA = c.ShapeA.GetBody();
                 if (!bodyA.IsValid) continue;
                 float3 comA = bodyA.GetWorldCenterOfMass();
 
@@ -118,8 +118,8 @@ namespace Box3D.Hybrid.Editor
         // (safe — no userData/GCHandle dereference). Raw-API bodies won't be found → "static/other".
         private static string OtherBodyName(ContactData c, Body self, Box3DBody[] all)
         {
-            Body a = new Body { Id = c.ShapeA.GetBody() };
-            Body b = new Body { Id = c.ShapeB.GetBody() };
+            Body a = c.ShapeA.GetBody();
+            Body b = c.ShapeB.GetBody();
             Body other = a == self ? b : a;
             foreach (Box3DBody component in all)
             {

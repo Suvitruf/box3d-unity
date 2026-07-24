@@ -148,7 +148,9 @@ namespace Box3D.Hybrid.Editor
 
         private void RefreshPreview()
         {
-            if (!Rope || Application.isPlaying) return;
+            // While the live editor simulation runs it owns the preview world — a second
+            // Box3DRopePreview here would detach scene geometry twice and leak the first copy.
+            if (_simulating || !Rope || Application.isPlaying) return;
             _lastStart = Rope.StartWorld;
             _lastEnd = Rope.EndWorld;
 

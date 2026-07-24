@@ -69,7 +69,7 @@ namespace Box3D.Hybrid
             _bodies.Clear();
             for (int i = 0; i < count; i++)
             {
-                _bodies.Add(new Body { Id = new Shape { Id = _overlap[i] }.GetBody() });
+                _bodies.Add(new Shape { Id = _overlap[i] }.GetBody());
             }
 
             float3 force = (float3)transform.forward * _currentStrength;
