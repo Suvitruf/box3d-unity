@@ -169,6 +169,27 @@ static collision, so the rope hangs over geometry exactly as it will in play mod
 Rendering goes through the rope's LineRenderer (style its material/width freely); the simulation
 drives its points every frame.
 
+## Settling props: the Physics Simulation tool
+
+Instead of nudging crates by hand until they look "dropped", let the solver place them:
+**Tools → Box3D → Physics Simulation** (also in the Scene-view tool palette). Select the props to
+settle and press **Space** (or the ▶ button in the Scene-view panel):
+
+- The **selected** dynamic bodies simulate live in the Scene view; every other enabled shape is
+  frozen at its current pose as static collision. It's the rope preview's recipe — a real Box3D
+  world built from the same shapes, damping and masses — so what settles here is what play mode
+  would produce.
+- **Left-drag** a simulating body to grab it: it hangs from the grab point and follows the cursor
+  on a soft spring at its original pick depth. Release mid-swing to throw it. Frozen geometry
+  blocks the pick, so you can't grab objects through walls.
+- **Space** (or ■, or **Esc**) stops. The settled poses are written to the real Transforms as
+  **one undo step** — a single undo restores every prop — and prefab instances get their
+  overrides recorded.
+
+Selection is designer-friendly: pick a parent group to simulate everything under it, or a visual
+child mesh and the owning body still counts. Only **Dynamic** bodies take part. Joint components
+are not replicated in the preview world yet — jointed assemblies settle as free bodies.
+
 ## Tooling components
 
 Drop-in components for diagnostics — all optional, none needed to simulate:

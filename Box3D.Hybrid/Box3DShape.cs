@@ -166,6 +166,14 @@ namespace Box3D.Hybrid
             return CreateShape(body, float3.zero, quaternion.identity, transform.lossyScale);
         }
 
+        /// <summary>Compound variant for preview bodies that own several shapes (editor physics
+        /// simulation): places the shape at a local frame within the body instead of assuming the
+        /// body sits at the shape's own transform.</summary>
+        internal Shape CreateDetachedShape(Body body, float3 localPosition, quaternion localRotation)
+        {
+            return CreateShape(body, localPosition, localRotation, transform.lossyScale);
+        }
+
         /// <summary>Frees native geometry a detached preview shape allocated (mesh shapes).
         /// Called after the preview world is destroyed.</summary>
         internal virtual void ReleaseDetachedGeometry() { }

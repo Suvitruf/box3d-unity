@@ -88,6 +88,11 @@ namespace Box3D.Hybrid
             AllowFastRotation = value;
         }
 
+        // Serialized damping, readable without a live body — the editor physics simulation builds
+        // its preview bodies with the same damping the runtime will use.
+        internal float LinearDampingValue => LinearDamping;
+        internal float AngularDampingValue => AngularDamping;
+
         private void Awake()
         {
             _world = Box3DWorld.Instance;
@@ -154,7 +159,8 @@ namespace Box3D.Hybrid
 
         // Collects shape components on this GameObject and descendants, stopping at any nested
         // Box3DBody (that subtree belongs to the other body). Unity's compound-collider gathering.
-        private static void GatherShapes(Transform node, System.Collections.Generic.List<Box3DShape> result, bool isRoot)
+        // Internal so the editor physics simulation builds its preview bodies from the same rules.
+        internal static void GatherShapes(Transform node, System.Collections.Generic.List<Box3DShape> result, bool isRoot)
         {
             if (!isRoot && node.GetComponent<Box3DBody>()) return;
 
