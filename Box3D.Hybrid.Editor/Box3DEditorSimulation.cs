@@ -112,7 +112,7 @@ namespace Box3D.Hybrid.Editor
                 if (hits[i].Fraction < closest.Fraction) closest = hits[i];
             }
 
-            BodyId hitBody = new Shape { Id = closest.ShapeId }.GetBody();
+            BodyId hitBody = new Shape { Id = closest.ShapeId }.GetBody().Id;
             Entry entry = null;
             foreach (Entry candidate in _entries)
             {

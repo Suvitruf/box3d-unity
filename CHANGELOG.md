@@ -1,5 +1,32 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — water
+- **`Box3DWater`** (Add Component → Box3D → Water, GameObject → Box3D → Water): GPU particle
+  water with a screen-space liquid surface. A box volume fills with fluid on play; a compute
+  position-based-fluids solver (neighbor grid, density constraints, cohesion, XSPH viscosity)
+  collides the particles with the Box3D shapes near the water bounds — spheres, capsules and box
+  hulls exactly, other shapes by bounding box — and hands the push-back to dynamic bodies as
+  impulses plus submersion drag, so props float, bob and get shoved by waves. Rendering splats
+  sphere impostors into per-camera depth/thickness buffers, smooths depth with a bilateral blur
+  and shades a fullscreen surface: refraction of the opaque scene, thickness-based absorption,
+  probe/sky reflections with Fresnel and a specular highlight (URP; needs Depth Texture, Opaque
+  Texture for refraction — otherwise falls back to alpha blending). Designer UX: scene-view
+  handles for the fill volume and simulation bounds, Fill / Splash / Clear Inspector buttons,
+  live particle count, pipeline-setting warnings. Scripting: `SpawnParticles` (recycling
+  emitters), `Fill`, `Clear`, and `ParticleBuffer`/`ActiveParticleRange` for custom renderers.
+  See `Documentation~/water.md`.
+- **`Box3DWaterfall`** (Add Component → Box3D → Waterfall, GameObject → Box3D → Waterfall): a
+  continuous emitter pouring particles from a rectangular lip along its forward axis — waterfall,
+  fountain or spout depending on how it's aimed. Selecting it previews the gravity flight arc in
+  the scene view; it pours into the scene's `Box3DWater` (recycling the oldest particles on a
+  fixed budget), auto-finds the water, and the tap toggles via `IsFlowing` or an Inspector
+  button. Backed by a new batched `Box3DWater.SpawnParticles(float4[], float4[], int)` overload
+  for custom emitters.
+- `Shape.GetHullLocalBounds()` — body-local bounding box of a hull shape's vertices (exact for
+  box hulls), for building oriented-box approximations.
+
 ## [0.7.0] — 2026-07-22
 
 ### Changed — naming: Box3d → Box3D

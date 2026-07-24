@@ -158,6 +158,7 @@ ones require the Input System package.
 - [Events](Documentation~/events.md)
 - [Queries](Documentation~/queries.md)
 - [Character mover](Documentation~/character-mover.md)
+- [Water](Documentation~/water.md) — GPU particle water with a screen-space surface and floating bodies
 - [Callbacks & threading](Documentation~/callbacks-and-threading.md)
 - [Debug draw](Documentation~/debug-draw.md)
 - [Determinism & replay](Documentation~/determinism-and-replay.md) — record, validate, and scrub replays
