@@ -56,3 +56,39 @@ buffer when `count == buffer.Length`.
 `QueryFilter.CategoryBits`/`MaskBits` work like shape filters: a shape is considered when
 `(queryCategory & shapeMask) != 0 && (shapeCategory & queryMask) != 0`. The default filter matches
 everything.
+
+## Dynamic tree (standalone spatial index)
+
+> 🎥 [Watch the showcase](https://www.youtube.com/watch?v=awPUUEsWGAg)
+
+Everything above queries the **physics** world. `DynamicTree` exposes box3d's broadphase AABB tree
+on its own, so you can build a fast "what's near here?" index over **your own non-physics data** —
+frustum/interest culling, "which enemies are in range", trigger/AI volumes, spatial audio — reusing
+the engine's cache-friendly tree instead of rolling a quadtree. It's independent of the physics
+world and uses its own category/mask bits (not `CollisionFilter`).
+
+Each proxy carries a 64-bit `userData` you set — typically an index or entity id you map back to
+your own objects. It owns native memory, so dispose it (`using` or `Dispose`).
+
+```csharp
+using var tree = new DynamicTree();
+
+// Insert proxies (fat AABBs) tagged with your own ids.
+for (int i = 0; i < enemies.Count; i++)
+    tree.CreateProxy(enemies[i].Bounds, userData: (ulong)i);
+
+// "Who's near the player?" — buffer-fill, no allocation.
+Span<DynamicTreeHit> hits = stackalloc DynamicTreeHit[32];
+int n = tree.Query(playerAabb, hits);
+for (int i = 0; i < n; i++)
+    Consider(enemies[(int)hits[i].UserData]);
+
+// As things move: re-fit (or EnlargeProxy when the box only grows), Rebuild occasionally.
+tree.MoveProxy(proxyId, enemies[proxyId].Bounds);
+```
+
+`Query` reports proxies overlapping an AABB. `RayCast`/`BoxCast` sweep a ray or box and report the
+proxies crossed — but the tree only knows **boxes, not shapes**, so these are a *broadphase* pass:
+they hand you candidates (by `UserData`); run your own precise test against each. All three fill a
+buffer and return the count (stopping early if it fills), with an `out TreeStats` overload for
+profiling. `QueryClosest` (nearest-proxy refinement) is not yet wrapped.

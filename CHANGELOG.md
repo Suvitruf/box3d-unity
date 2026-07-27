@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.1] — 2026-07-27
+
+### Added
+- **`DynamicTree`** — box3d's broadphase AABB tree exposed as a standalone spatial index for your own
+  (non-physics) data: a fast "what's near here?" over thousands of moving objects — AI perception,
+  interest management, trigger volumes, culling — without spinning up colliders. Insert proxies
+  (each with a 64-bit `userData`), `MoveProxy` them as things move, and query by region (`Query`),
+  ray (`RayCast`) or swept box (`BoxCast`) — buffer-fill, allocation-free, with `out TreeStats`
+  overloads. Introspection (`ProxyCount` / `Height` / `RootBounds` / `ByteCount` / `Rebuild`) and
+  `Validate`. `IDisposable` (owns native memory). See
+  [Dynamic tree](Documentation~/queries.md#dynamic-tree-standalone-spatial-index) and the
+  [showcase video](https://www.youtube.com/watch?v=awPUUEsWGAg). (`QueryClosest` is not yet wrapped.)
+
 ## [0.7.0] — 2026-07-22
 
 ### Changed — naming: Box3d → Box3D
