@@ -1,3 +1,4 @@
+using System;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -25,6 +26,7 @@ namespace Box3D.Hybrid
         private Vector3 Center = Vector3.zero;
 
         private Shape _shape;
+        private Body _attachedBody; // the body this shape was created on (rebuilds recreate on it)
         private Body _ownBody; // only set when this shape has no Box3DBody and creates a static one
 
         // The attach frame from AttachTo, kept so Inspector edits can rebuild geometry in place.
@@ -132,12 +134,20 @@ namespace Box3D.Hybrid
         /// <paramref name="localRotation"/> place the shape relative to the body's frame (identity
         /// for a shape on the body's own GameObject); <paramref name="scale"/> is the shape
         /// GameObject's lossy scale, baked into the dimensions.</summary>
-        internal void AttachTo(Body body, float3 localPosition, quaternion localRotation, float3 scale)
+        internal void AttachTo(Body body, float3 localPosition, quaternion localRotation, float3 scale,
+            IntPtr ownerData = default, bool enableHitEvents = false)
         {
             _attachPosition = localPosition;
             _attachRotation = localRotation;
             _attachScale = scale;
+            _attachedBody = body;
             _shape = CreateShape(body, localPosition, localRotation, scale);
+            if (!_shape.IsValid) return;
+
+            // The owning Box3DBody's GCHandle rides in shape userData, so a contact event maps its
+            // ShapeId straight back to the component — the shape-level twin of the body-move channel.
+            if (ownerData != IntPtr.Zero) _shape.UserData = ownerData;
+            if (enableHitEvents) _shape.EnableHitEvents(true);
         }
 
 #if UNITY_EDITOR
@@ -156,6 +166,41 @@ namespace Box3D.Hybrid
         /// <summary>Pushes edited geometry to the live native shape where the engine supports
         /// in-place replacement (sphere and capsule). Other shapes keep their creation geometry.</summary>
         protected virtual void UpdateLiveGeometry() { }
+
+        /// <summary>The body this shape was created on (valid alongside <see cref="LiveShape"/>).</summary>
+        protected Body AttachedBody => _attachedBody;
+
+        /// <summary>Rebuilds the live collision from deformed vertices in this GameObject's local
+        /// space — the deformable's Update Collision mode. Hull and mesh shapes support it; other
+        /// shapes return false and keep their creation geometry. The replacement is created first
+        /// so a failed rebuild leaves the old collision in place; userData and event opt-ins carry
+        /// over, and body mass is re-derived.</summary>
+        internal bool TryRebuildGeometry(Vector3[] vertices, int[] triangles)
+        {
+            if (!_shape.IsValid || !_attachedBody.IsValid || vertices == null) return false;
+
+            IntPtr userData = _shape.UserData;
+            bool hitEvents = _shape.AreHitEventsEnabled();
+
+            Shape rebuilt = CreateRebuiltShape(vertices, triangles);
+            if (!rebuilt.IsValid) return false;
+
+            _shape.Destroy(updateBodyMass: true); // re-derives mass over remaining + rebuilt shapes
+            ReleaseRebuiltGeometry();
+            _shape = rebuilt;
+            if (userData != IntPtr.Zero) _shape.UserData = userData;
+            if (hitEvents) _shape.EnableHitEvents(true);
+            return true;
+        }
+
+        /// <summary>Shape-specific rebuild: create the replacement native shape from the deformed
+        /// vertices (and triangle topology, for mesh shapes), or default when unsupported. Runs
+        /// while the old shape still exists — geometry it references must stay alive until
+        /// <see cref="ReleaseRebuiltGeometry"/>.</summary>
+        internal virtual Shape CreateRebuiltShape(Vector3[] vertices, int[] triangles) => default;
+
+        /// <summary>Frees geometry the pre-rebuild shape referenced, once that shape is destroyed.</summary>
+        internal virtual void ReleaseRebuiltGeometry() { }
 
 #if UNITY_EDITOR
         /// <summary>Creates this shape on a body in a throwaway preview world (rope editor

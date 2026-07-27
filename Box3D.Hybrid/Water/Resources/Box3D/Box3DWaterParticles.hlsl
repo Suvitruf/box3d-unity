@@ -6,13 +6,15 @@ float4x4 _Box3DWaterView;                       // camera worldToCameraMatrix
 float4x4 _Box3DWaterProj;                       // GPU projection (render-into-texture convention)
 float    _Box3DWaterRenderRadius;               // impostor radius (particle radius × render scale)
 float    _Box3DWaterThicknessScale;
+float    _Box3DWaterStretch;                    // spray elongation along motion (0 = always round)
 
 struct Varyings
 {
     float4 pos : SV_POSITION;
-    float2 uv : TEXCOORD0;      // corner in [-1, 1]
+    float2 uv : TEXCOORD0;         // corner in [-1, 1], ellipse-local
     float3 viewCenter : TEXCOORD1;
     float foam : TEXCOORD2;
+    float2 viewOffset : TEXCOORD3; // this corner's view-space offset from the center
 };
 
 static const float2 kCorners[6] =
@@ -26,11 +28,13 @@ Varyings Vert(uint vid : SV_VertexID)
     uint index = vid / 6;
     float2 corner = kCorners[vid - index * 6];
     float4 particle = _Box3DWaterPositions[index];
+    float4 velFoam = _Box3DWaterVelocities[index];
 
     Varyings o;
     o.uv = corner;
     o.viewCenter = mul(_Box3DWaterView, float4(particle.xyz, 1.0)).xyz;
-    o.foam = _Box3DWaterVelocities[index].w;
+    o.foam = velFoam.w;
+    o.viewOffset = float2(0.0, 0.0);
 
     if (particle.w < 0.5)
     {
@@ -38,8 +42,18 @@ Varyings Vert(uint vid : SV_VertexID)
         return o;
     }
 
-    float3 viewPos = o.viewCenter + float3(corner * _Box3DWaterRenderRadius, 0.0);
-    o.pos = mul(_Box3DWaterProj, float4(viewPos, 1.0));
+    // Whitewater should read as spray, not stacked balls: foamy/fast impostors stretch along
+    // their screen-space motion and thin out crosswise (area-preserving), so churned water
+    // breaks into streaks. Calm water keeps perfectly round impostors.
+    float3 viewVel = mul((float3x3)_Box3DWaterView, velFoam.xyz);
+    float flowLen = length(viewVel.xy);
+    float spray = saturate(o.foam * 1.5 + 0.5 * smoothstep(2.5, 6.0, length(velFoam.xyz)));
+    float elong = 1.0 + min(flowLen * 0.35, 2.0) * spray * _Box3DWaterStretch;
+    float2 dir = flowLen > 1e-3 ? viewVel.xy / flowLen : float2(1, 0);
+    float2 perp = float2(-dir.y, dir.x);
+
+    o.viewOffset = (corner.x * dir * elong + corner.y * perp / sqrt(elong)) * _Box3DWaterRenderRadius;
+    o.pos = mul(_Box3DWaterProj, float4(o.viewCenter + float3(o.viewOffset, 0.0), 1.0));
     return o;
 }
 
@@ -56,7 +70,7 @@ float4 FragDepth(Varyings i, out float depth : SV_Depth) : SV_Target
     float nz = SphereZ(i.uv);
 
     // Camera looks down -Z in view space: the front of the sphere is the most positive z.
-    float3 viewSurf = i.viewCenter + float3(i.uv * _Box3DWaterRenderRadius, nz * _Box3DWaterRenderRadius);
+    float3 viewSurf = i.viewCenter + float3(i.viewOffset, nz * _Box3DWaterRenderRadius);
     float4 clipPos = mul(_Box3DWaterProj, float4(viewSurf, 1.0));
     depth = clipPos.z / clipPos.w;
 
@@ -65,20 +79,26 @@ float4 FragDepth(Varyings i, out float depth : SV_Depth) : SV_Target
 
 float4 FragThickness(Varyings i) : SV_Target
 {
-    float nz = SphereZ(i.uv);
-    return float4(nz * 2.0 * _Box3DWaterRenderRadius * _Box3DWaterThicknessScale, 0, 0, 1);
+    // (1 - r²)² bump with the same disk-average as the sphere chord it replaces. The chord's
+    // vertical slope at the rim stamps a hard-edged coin per particle into the additive
+    // buffer — absorption then shows every ball. This profile fades to zero smoothly.
+    float s = 1.0 - dot(i.uv, i.uv);
+    clip(s);
+    return float4(s * s * 4.0 * _Box3DWaterRenderRadius * _Box3DWaterThicknessScale, 0, 0, 1);
 }
 
 // Foam splat, z-tested against the impostor depth buffer (with a hair of bias toward the
 // camera) so only whitewater on the visible surface accumulates — not foam deep inside.
 float4 FragFoam(Varyings i, out float depth : SV_Depth) : SV_Target
 {
-    float nz = SphereZ(i.uv);
+    float s = 1.0 - dot(i.uv, i.uv);
+    clip(s);
 
-    float3 viewSurf = i.viewCenter + float3(i.uv * _Box3DWaterRenderRadius, nz * _Box3DWaterRenderRadius);
+    float3 viewSurf = i.viewCenter + float3(i.viewOffset, sqrt(s) * _Box3DWaterRenderRadius);
     viewSurf.z += 0.02 * _Box3DWaterRenderRadius; // toward the camera: survive the LEqual test
     float4 clipPos = mul(_Box3DWaterProj, float4(viewSurf, 1.0));
     depth = clipPos.z / clipPos.w;
 
-    return float4(i.foam * nz * nz, 0, 0, 1); // center-weighted so splats stay round
+    // Soft center-weighted splat: dense piles accumulate gently instead of clipping to a disc.
+    return float4(i.foam * s * s, 0, 0, 1);
 }

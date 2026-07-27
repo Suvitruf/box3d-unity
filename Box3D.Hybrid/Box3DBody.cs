@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using Unity.Mathematics;
 using UnityEngine;
@@ -41,6 +42,7 @@ namespace Box3D.Hybrid
         private Box3DWorld _world;
         private Body _body;
         private Box3DShape[] _shapes;
+        private IBox3DHitReceiver[] _hitReceivers;
         // A handle to this component lives in the native body's userData, so a body-move event
         // dereferences straight back here — no managed-side lookup list.
         private GCHandle _handle;
@@ -116,13 +118,19 @@ namespace Box3D.Hybrid
             GatherShapes(transform, shapes, isRoot: true);
             _shapes = shapes.ToArray();
 
+            var receivers = new System.Collections.Generic.List<IBox3DHitReceiver>();
+            GatherHitReceivers(transform, receivers, isRoot: true);
+            _hitReceivers = receivers.ToArray();
+
             quaternion bodyInverse = math.inverse((quaternion)transform.rotation);
+            IntPtr ownerData = GCHandle.ToIntPtr(_handle);
             foreach (Box3DShape shape in _shapes)
             {
                 Transform shapeTransform = shape.transform;
                 float3 localPosition = transform.InverseTransformPoint(shapeTransform.position);
                 quaternion localRotation = math.mul(bodyInverse, shapeTransform.rotation);
-                shape.AttachTo(_body, localPosition, localRotation, shapeTransform.lossyScale);
+                shape.AttachTo(_body, localPosition, localRotation, shapeTransform.lossyScale,
+                    ownerData, _hitReceivers.Length > 0);
             }
 
             if (Type == Box3DBodyType.Kinematic) _world.AddKinematic(this);
@@ -175,6 +183,38 @@ namespace Box3D.Hybrid
 
         private static readonly System.Collections.Generic.List<Box3DShape> TempShapes =
             new System.Collections.Generic.List<Box3DShape>();
+
+        // Hit receivers follow the same subtree rule as shapes: a nested Box3DBody owns the
+        // receivers (and shapes) below it.
+        private static void GatherHitReceivers(Transform node,
+            System.Collections.Generic.List<IBox3DHitReceiver> result, bool isRoot)
+        {
+            if (!isRoot && node.GetComponent<Box3DBody>()) return;
+
+            node.GetComponents(TempReceivers);
+            result.AddRange(TempReceivers);
+
+            for (int i = 0; i < node.childCount; i++)
+            {
+                GatherHitReceivers(node.GetChild(i), result, isRoot: false);
+            }
+        }
+
+        private static readonly System.Collections.Generic.List<IBox3DHitReceiver> TempReceivers =
+            new System.Collections.Generic.List<IBox3DHitReceiver>();
+
+        /// <summary>True when this body has hit receivers (its shapes opted into hit events).</summary>
+        internal bool WantsHits => _hitReceivers != null && _hitReceivers.Length > 0;
+
+        /// <summary>Called by the world after each step for every hit event on this body's shapes.</summary>
+        internal void DispatchHit(in Box3DHit hit)
+        {
+            foreach (IBox3DHitReceiver receiver in _hitReceivers)
+            {
+                if (receiver is Behaviour behaviour && (!behaviour || !behaviour.isActiveAndEnabled)) continue;
+                receiver.OnBox3DHit(hit);
+            }
+        }
 
         /// <summary>Called by the world (kinematic list only) before each step.</summary>
         internal void PushKinematic(float deltaTime)

@@ -184,12 +184,18 @@ Shader "Box3D/Water Surface"
 
                 // Whitewater: churned foam splatted by the particles + the waterline rim,
                 // broken up by two octaves of drifting noise (coverage-threshold style).
-                float churn = _Box3DWaterFoamTex.SampleLevel(sampler_Box3DWaterFoamTex, uv, 0).r;
-                float cover = saturate(churn * 1.2 + (1.0 - shore) * 0.8) * _FoamStrength;
+                // The splat field saturates softly (1 - e^-x) and coverage is capped below 1,
+                // so a dense pile of foamy particles stays holey, textured spray instead of
+                // fusing into one solid white ball.
+                float churn = 1.0 - exp(-1.7 * _Box3DWaterFoamTex.SampleLevel(sampler_Box3DWaterFoamTex, uv, 0).r);
+                float cover = min(saturate(churn * 1.3 + (1.0 - shore) * 0.8) * _FoamStrength, 0.93);
                 float noise = 0.55 * ValueNoise(worldPos.xz * 6.0 + _Box3DWaterTime * 0.35)
                             + 0.45 * ValueNoise(worldPos.xz * 15.0 - _Box3DWaterTime * 0.6);
-                float foam = smoothstep(1.0 - cover, 1.0 - cover + 0.3, noise) * saturate(cover * 2.0);
-                float3 foamColor = _MainLightColor.rgb * 0.85 + 0.25;
+                float foam = smoothstep(1.0 - cover, 1.0 - cover + 0.35, noise) * saturate(cover * 2.0);
+                foam *= 0.72 + 0.28 * noise; // bubbly brightness variation inside dense patches
+                // A hint of diffuse shading keeps heavy foam reading as a lit surface, not flat white.
+                float3 foamColor = (_MainLightColor.rgb * 0.85 + 0.25)
+                                 * (0.75 + 0.25 * saturate(dot(nWorld, lightDir)));
 
                 float3 color;
                 float alpha;

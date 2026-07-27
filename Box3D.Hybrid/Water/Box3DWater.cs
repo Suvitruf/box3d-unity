@@ -93,6 +93,9 @@ namespace Box3D.Hybrid
         [SerializeField, Range(0f, 1f), Tooltip("Whitewater strength. Fast, aerated water (splashes, impacts, waterfalls) churns into foam, plus a foam rim where objects pierce the surface.")]
         private float Foam = 0.5f;
 
+        [SerializeField, Range(0f, 2f), Tooltip("How much fast, foamy droplets stretch into streaks along their motion. 0 keeps every droplet round; higher makes whitewater read as flying spray.")]
+        private float FoamStretch = 1f;
+
         [SerializeField, Range(0.01f, 0.5f), Tooltip("How softly the water blends into objects and shores it touches, in meters. Small = crisp waterline, large = misty fade.")]
         private float ShoreBlend = 0.12f;
 
@@ -107,6 +110,7 @@ namespace Box3D.Hybrid
         private const int Threads = 128;
         private const int MaxColliders = 256;
         private const int MaxBodies = 128;
+        private const int MaxWinds = 8;            // wind volumes per step, 4 float4s each — must match _WindData in the compute
         private const float ImpulseScale = 256f;   // fixed-point scale used by the compute kernels
         private const float RestDensity = 1000f;
 
@@ -185,6 +189,7 @@ namespace Box3D.Hybrid
         internal float SurfaceRefraction => Refraction;
         internal float SurfaceReflection => Reflection;
         internal float SurfaceFoam => Foam;
+        internal float SurfaceFoamStretch => FoamStretch;
         internal float SurfaceShoreBlend => ShoreBlend;
         internal float SmoothingWorldRadius => SmoothingRadius;
 
@@ -371,6 +376,36 @@ namespace Box3D.Hybrid
             _spawnCursor = 0;
         }
 
+        // ------------------------------------------------------------------ wind
+
+        private readonly Vector4[] _windData = new Vector4[MaxWinds * 4];
+        private int _windCount;
+        private double _windQueueTime = -1.0; // fixed step the queue belongs to (stale entries reset)
+
+        /// <summary>Queues an oriented wind box for the next fluid step: particles inside get up to
+        /// <paramref name="acceleration"/> (m/s²) — full strength on surface, spray and foam, fading
+        /// to nothing in the bulk. The queue holds one physics step; call every FixedUpdate while the
+        /// wind blows (<see cref="Box3DWind"/> does this for its zone). At most 8 winds per step.</summary>
+        public void AddWind(Vector3 center, Quaternion rotation, Vector3 halfExtents, Vector3 acceleration)
+        {
+            // Winds queue after this water's step (Box3DWater runs early at -50) and are consumed
+            // by the next one; a queue left over from an older step has already been consumed.
+            double now = Time.fixedTimeAsDouble;
+            if (_windQueueTime != now)
+            {
+                _windQueueTime = now;
+                _windCount = 0;
+            }
+
+            if (_windCount >= MaxWinds) return;
+            int slot = _windCount * 4;
+            _windData[slot + 0] = center;
+            _windData[slot + 1] = new Vector4(rotation.x, rotation.y, rotation.z, rotation.w);
+            _windData[slot + 2] = halfExtents;
+            _windData[slot + 3] = acceleration;
+            _windCount++;
+        }
+
         // ------------------------------------------------------------------ stepping
 
         private void FixedUpdate()
@@ -411,6 +446,9 @@ namespace Box3D.Hybrid
             _compute.SetFloat("_CouplingScale", TwoWayCoupling ? CouplingStrength : 0f);
             _compute.SetFloat("_MaxSpeed", h / dt);
             _compute.SetFloat("_FoamDecay", Mathf.Exp(-1.1f * dt));
+            _compute.SetInt("_WindCount", _windCount);
+            if (_windCount > 0) _compute.SetVectorArray("_WindData", _windData);
+            _windCount = 0; // consumed — a wind that stopped blowing must not linger
 
             _bodyImpulses.SetData(_impulseClear);
 

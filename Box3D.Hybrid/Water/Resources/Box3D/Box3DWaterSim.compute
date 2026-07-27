@@ -78,6 +78,8 @@ cbuffer Params
     float  _CouplingScale;    // scales impulses handed back to rigid bodies
     float  _MaxSpeed;         // CFL clamp
     float  _FoamDecay;        // per-substep foam retain factor
+    uint   _WindCount;        // active wind volumes, 4 float4s each (see _WindData)
+    float4 _WindData[32];     // per wind: [0] center.xyz, [1] rotation quat, [2] half extents.xyz, [3] acceleration.xyz
 }
 
 // ---------------------------------------------------------------- kernels & helpers
@@ -126,6 +128,26 @@ void Predict(uint3 id : SV_DispatchThreadID)
 
     float3 v = _Velocities[i].xyz;
     v += _Gravity * _DeltaTime;
+
+    // Wind volumes (Box3DWind): an acceleration inside each oriented box. Wind grips the
+    // surface, not the bulk — full effect on under-dense particles (surface, spray) and on
+    // foam, fading to nothing in the incompressible interior. A per-particle hash ripple
+    // breaks the response so the surface doesn't slide as one sheet (XSPH smooths it back
+    // into gusty patches).
+    if (_WindCount > 0)
+    {
+        float grip = saturate(saturate((1.0 - _Densities[i]) * 2.5) + _Velocities[i].w);
+        float ripple = 0.7 + 0.6 * frac(sin(dot(pos.xz, float2(12.9898, 78.233))) * 43758.5453);
+        float windScale = grip * ripple * _DeltaTime;
+        for (uint w = 0; w < _WindCount; w++)
+        {
+            uint b = w * 4u;
+            float3 local = RotateByQuatInv(_WindData[b + 1], pos.xyz - _WindData[b].xyz);
+            if (any(abs(local) > _WindData[b + 2].xyz)) continue;
+            v += _WindData[b + 3].xyz * windScale;
+        }
+    }
+
     v *= _Damping;
     float speed = length(v);
     if (speed > _MaxSpeed) v *= _MaxSpeed / speed;

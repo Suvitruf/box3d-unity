@@ -23,6 +23,13 @@
   (**Shore Blend**) instead of a hard depth cut, with refraction relaxing to zero at the edge.
   New **Foam** and **Shore Blend** sliders on `Box3DWater`; foam ships to custom renderers in
   `VelocityBuffer` (w channel).
+- **Water no longer reads as a pile of balls**: the additive thickness and foam buffers are now
+  Gaussian-smoothed (footprint taken from the smoothed depth) and the per-particle thickness
+  splat swapped for a soft rimless bump, so **Absorption** tints one continuous body of water
+  instead of stamping every impostor as a coin. Foam coverage saturates softly and stays
+  noise-broken and lightly shaded at full strength instead of fusing into a solid white ball,
+  and fast foamy droplets stretch into streaks along their motion so whitewater reads as flying
+  spray — new **Foam Stretch** slider on `Box3DWater` (0 keeps droplets round).
 - **`Box3DWaterfall`** (Add Component → Box3D → Waterfall, GameObject → Box3D → Waterfall): a
   continuous emitter pouring particles from a rectangular lip along its forward axis — waterfall,
   fountain or spout depending on how it's aimed. Selecting it previews the gravity flight arc in
@@ -30,8 +37,36 @@
   fixed budget), auto-finds the water, and the tap toggles via `IsFlowing` or an Inspector
   button. Backed by a new batched `Box3DWater.SpawnParticles(float4[], float4[], int)` overload
   for custom emitters.
+- **Wind blows on water**: a `Box3DWind` zone overlapping a `Box3DWater` now accelerates the
+  fluid — full strength on surface, spray and foam, fading to nothing in the bulk, gusting with
+  the same Perlin noise the rigid bodies feel. New **Water Influence** slider on `Box3DWind`
+  (0 = rigid-body-only, as before); custom force fields can drive the same input via the new
+  `Box3DWater.AddWind(center, rotation, halfExtents, acceleration)` (up to 8 volumes per step).
 - `Shape.GetHullLocalBounds()` — body-local bounding box of a hull shape's vertices (exact for
   box hulls), for building oriented-box approximations.
+
+### Added — impact deformation
+- **`Box3DDeformable`** (Add Component → Box3D → Deformable): dents the GameObject's mesh where
+  physics impacts land — vertices near the impact point are pushed along the impact direction with
+  a smooth falloff over **Radius**, scaled by impact speed (**Strength**, capped by **Max Depth**
+  so repeated hits pile up only so far). Works next to any Box3D shape: deformation is applied to
+  a private copy of the visual mesh, so collision geometry, the shared asset and determinism are
+  untouched. Static bodies dent too (walls, floors). **Recovery Speed** heals dents back over time
+  (0 = permanent); **Min Impact Speed** ignores light touches. Designer UX: import-settings and
+  missing-body warnings in the Inspector, play-mode **Test Dent** / **Reset Deformation** buttons,
+  dent-radius gizmo, auto-adds a `Box3DBody` when the hierarchy has none. Scripting:
+  `Dent(point, direction, speed)`, `ResetDeformation()`, `IsDeformed`.
+- **Update Collision** (opt-in on `Box3DDeformable`): rebuilds hull/mesh collision on the same
+  GameObject from the dented vertices, throttled by a rebuild cooldown. Hulls are recomputed
+  convex (dents register where they flatten corners/edges); static mesh shapes take true craters.
+  The replacement shape is created before the old one is destroyed — a failed rebuild keeps the
+  old collision — and userData, hit-event opt-ins and body mass carry over. Off by default since
+  history-dependent collision makes recorded replays diverge; the Inspector explains the limits.
+- **Component-layer impact events**: `Box3DWorld` now reads native contact hit events each step and
+  delivers them as `Box3DHit` (world point, impact direction into the receiver, approach speed,
+  other body) to every `IBox3DHitReceiver` under the body — implement it for impact sounds, decals
+  or particles. Bodies with receivers opt their shapes into hit events automatically; shape
+  userData now carries the owning `Box3DBody` for event routing.
 
 ## [0.7.0] — 2026-07-22
 

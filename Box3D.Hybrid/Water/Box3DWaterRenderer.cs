@@ -131,6 +131,7 @@ namespace Box3D.Hybrid
             _cmd.SetGlobalMatrix("_Box3DWaterProj", gpuProj);
             _cmd.SetGlobalFloat("_Box3DWaterRenderRadius", _water.RenderRadius);
             _cmd.SetGlobalFloat("_Box3DWaterThicknessScale", 1f);
+            _cmd.SetGlobalFloat("_Box3DWaterStretch", _water.SurfaceFoamStretch);
 
             // Sphere-impostor eye depth, hardware z-tested against itself.
             _cmd.SetRenderTarget(targets.Depth);
@@ -155,16 +156,30 @@ namespace Box3D.Hybrid
             {
                 float projScaleY = camera.projectionMatrix[1, 1];
                 float pixelsPerMeter = projScaleY * targets.Depth.height * 0.5f;
-                _cmd.SetGlobalFloat("_Box3DWaterBlurDepthScale",
-                    _water.SmoothingWorldRadius * _water.SurfaceSmoothing * pixelsPerMeter);
+                float depthScale = _water.SmoothingWorldRadius * _water.SurfaceSmoothing * pixelsPerMeter;
+                _cmd.SetGlobalFloat("_Box3DWaterBlurDepthScale", depthScale);
                 _cmd.SetGlobalFloat("_Box3DWaterBlurFalloff", _water.SmoothingWorldRadius * 2f);
                 var texel = new Vector4(1f / targets.Depth.width, 1f / targets.Depth.height,
                     targets.Depth.width, targets.Depth.height);
 
                 for (int i = 0; i < 2; i++)
                 {
-                    BlurPass(targets.Depth, targets.BlurTmp, new Vector2(1f, 0f), texel);
-                    BlurPass(targets.BlurTmp, targets.Depth, new Vector2(0f, 1f), texel);
+                    BlurPass(targets.Depth, targets.BlurTmp, new Vector2(1f, 0f), texel, pass: 0);
+                    BlurPass(targets.BlurTmp, targets.Depth, new Vector2(0f, 1f), texel, pass: 0);
+                }
+
+                // The additive fields feed absorption and foam coverage directly, so raw sphere
+                // splats read as a pile of coins/one white ball. A plain Gaussian each (footprint
+                // taken from the smoothed depth) melts them into continuous fields; foam gets a
+                // wider pass so whitewater reads as spray rather than discrete splats.
+                _cmd.SetGlobalTexture("_Box3DWaterBlurDepth", targets.Depth);
+                BlurPass(targets.Thickness, targets.BlurTmp, new Vector2(1f, 0f), texel, pass: 1);
+                BlurPass(targets.BlurTmp, targets.Thickness, new Vector2(0f, 1f), texel, pass: 1);
+                if (_water.SurfaceFoam > 0f)
+                {
+                    _cmd.SetGlobalFloat("_Box3DWaterBlurDepthScale", depthScale * 1.5f);
+                    BlurPass(targets.Foam, targets.BlurTmp, new Vector2(1f, 0f), texel, pass: 1);
+                    BlurPass(targets.BlurTmp, targets.Foam, new Vector2(0f, 1f), texel, pass: 1);
                 }
             }
 
@@ -181,13 +196,13 @@ namespace Box3D.Hybrid
             PushSurfaceLook();
         }
 
-        private void BlurPass(RenderTexture src, RenderTexture dst, Vector2 dir, Vector4 texel)
+        private void BlurPass(RenderTexture src, RenderTexture dst, Vector2 dir, Vector4 texel, int pass)
         {
             _cmd.SetGlobalTexture("_Box3DWaterBlurSrc", src);
             _cmd.SetGlobalVector("_Box3DWaterBlurSrc_TexelSize", texel);
             _cmd.SetGlobalVector("_Box3DWaterBlurDir", dir);
             _cmd.SetRenderTarget(dst);
-            _cmd.DrawProcedural(Matrix4x4.identity, _blurMat, 0, MeshTopology.Triangles, 3);
+            _cmd.DrawProcedural(Matrix4x4.identity, _blurMat, pass, MeshTopology.Triangles, 3);
         }
 
         private void PushSurfaceLook()

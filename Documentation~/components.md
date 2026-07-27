@@ -20,6 +20,7 @@ If you know Unity's physics components, you already know these:
 | `Box3DMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
 | `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. |
 | `Box3DExplosion` | — | Radial impulse burst with radius + falloff. |
+| `Box3DDeformable` | — | Dents the visual mesh where impacts land; optional healing. |
 | `Box3DRope` | — | Source 2-style cable: live editor preview, bake static or simulate in game. |
 
 ## Quick start
@@ -138,14 +139,48 @@ Scene-authorable force fields — select one to see its gizmos:
 - **`Box3DWind`** — a box volume that pushes every dynamic body inside along the object's forward
   (+Z) axis each step; rotate the object to aim it. **Strength** is newtons (negative blows
   backward); **Ignore Mass** applies it as acceleration so light and heavy bodies drift equally;
-  **Gust Amplitude** / **Gust Frequency** add Perlin-noise gusting. Gizmos show the zone and a grid
-  of arrows whose length follows the live gust strength in play mode.
+  **Gust Amplitude** / **Gust Frequency** add Perlin-noise gusting. The zone also blows the scene's
+  `Box3DWater`: fluid at the surface (and foam) gets **Strength × Water Influence** as
+  acceleration, fading to nothing below the surface — 0 leaves the water untouched. Gizmos show
+  the zone and a grid of arrows whose length follows the live gust strength in play mode.
 - **`Box3DExplosion`** — a radial impulse burst (native `World.Explode`) at the object's position:
   full **Impulse Per Area** inside **Radius**, fading to zero over **Falloff** beyond it. Trigger
   with `Explode()` from code, the Inspector's **Explode** button, or **Explode On Enable** for
   spawned prefabs. Gizmos show both radii and the blast rays.
 
 Both live under **Add Component → Box3D → Forces** and **GameObject → Box3D**.
+
+## Deformation
+
+`Box3DDeformable` (**Add Component → Box3D → Deformable**) dents the GameObject's mesh where
+physics impacts land: vertices near the impact point are pushed along the impact direction,
+deepest at the point and fading to zero at **Radius**, scaled by the impact speed. Put it next to
+the `MeshFilter` on a body with any Box3D shape — the shape type doesn't matter, since the dent is
+applied to a private copy of the visual mesh (the shared asset and the collision geometry are
+never touched, so determinism and replay stay exact). Static bodies work too, so walls and floors
+can dent.
+
+- **Strength** is dent depth in meters per m/s of impact speed; **Max Depth** caps how far any
+  vertex can pile up over repeated hits, so the mesh never folds through itself.
+- **Min Impact Speed** ignores light touches (the world already skips impacts below its ~1 m/s
+  hit-event threshold).
+- **Recovery Speed** heals dents back at that many m/s — 0 leaves them permanent (crumpled
+  metal); a high value reads as rubber.
+- The mesh must have **Read/Write** enabled; the Inspector warns when it isn't, and its play-mode
+  **Test Dent** / **Reset Deformation** buttons let you tune dents without staging collisions.
+- **Update Collision** (off by default) rebuilds hull/mesh collision on the same GameObject from
+  the dented vertices, throttled by **Rebuild Cooldown**. Physics honesty: hulls stay convex, so
+  dents register only where they flatten corners or edges (a crushed can rests differently); a
+  static `Box3DMeshShape` takes true craters (balls roll into the dented floor). Box, sphere and
+  capsule shapes can't change. Because collision then depends on impact history, recorded replays
+  diverge — leave it off when you rely on determinism.
+- From code: `Dent(point, direction, speed)` for scripted damage, `ResetDeformation()`,
+  `IsDeformed` for damage states.
+
+Under the hood the body opts its shapes into native hit events and forwards each impact to every
+`IBox3DHitReceiver` on the body (same subtree rules as shapes). Implement that interface yourself
+for impact sounds, decals or particles — `Box3DHit` carries the world-space point, the impact
+direction into your surface, the approach speed and the other body.
 
 ## Rope
 
