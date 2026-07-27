@@ -35,6 +35,9 @@ This project was inspired by, and owes its architecture to, two projects:
   events, delivered as zero-copy spans (the compiler enforces the transient-memory rule).
 - **Queries** — closest-hit and all-hits ray casts, shape casts, AABB/shape overlaps, all
   allocation-free via caller-provided buffers.
+- **Dynamic tree** — box3d's broadphase AABB tree as a standalone spatial index for your own
+  (non-physics) data: a fast "what's near here?" over thousands of moving objects — AI perception,
+  interest management, trigger volumes, culling — without spinning up colliders.
 - **Character mover** — box3d's kinematic capsule toolkit (collide → solve planes → clip velocity)
   with a ready-made sample controller.
 - **Callbacks** — custom collision filtering, pre-solve contact veto, friction/restitution mixing
