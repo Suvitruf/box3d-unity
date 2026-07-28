@@ -13,9 +13,14 @@ namespace Box3D.Tests
         public void QueryStructSizes_MatchNativeLayout()
         {
             Assert.AreEqual(32, UnsafeUtility.SizeOf<QueryFilter>());
-            Assert.AreEqual(64, UnsafeUtility.SizeOf<RayResult>());
             Assert.AreEqual(52, UnsafeUtility.SizeOf<MassData>());
+#if BOX3D_DOUBLE
+            Assert.AreEqual(80, UnsafeUtility.SizeOf<RayResult>());     // Point is a double B3Pos
+            Assert.AreEqual(48, UnsafeUtility.SizeOf<ExplosionDef>());  // Position is a double B3Pos
+#else
+            Assert.AreEqual(64, UnsafeUtility.SizeOf<RayResult>());
             Assert.AreEqual(32, UnsafeUtility.SizeOf<ExplosionDef>());
+#endif
         }
 
         [Test]

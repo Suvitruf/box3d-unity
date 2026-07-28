@@ -42,7 +42,11 @@ namespace Box3D.Tests
             Assert.AreEqual(1f, distance.Length);
             Assert.AreEqual(float.MinValue, distance.LowerSpringForce);
             Assert.AreEqual(float.MaxValue, distance.UpperSpringForce);
+#if BOX3D_DOUBLE
+            Assert.AreEqual(1e9f, distance.MaxLength, 1f); // B3_HUGE widens in large-world mode
+#else
             Assert.AreEqual(100000f, distance.MaxLength, 1f);
+#endif
 
             WheelJointDef wheel = WheelJointDef.Default;
             Assert.IsTrue(wheel.EnableSuspensionSpring);
@@ -84,7 +88,7 @@ namespace Box3D.Tests
                 world.Step(1f / 60f);
             }
 
-            float distance = math.distance(anchor.Position, hanging.Position);
+            float distance = (float)math.distance(anchor.Position, hanging.Position);
             Assert.AreEqual(1f, distance, 0.01f, "hanging body should stay at the joint rest length");
 
             world.Destroy();

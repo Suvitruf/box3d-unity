@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.7.2] — 2026-07-28
+
+### Added — opt-in double precision (large worlds)
+- **`BOX3D_DOUBLE`** scripting define enables Box3D's double-precision mode: world **positions**
+  widen to double (accurate far beyond float's ~16 km limit) while velocities, rotations and local
+  geometry stay float. Single precision remains the default and is unchanged. Full guide:
+  [double precision](Documentation~/double-precision.md).
+- **New real types `B3Pos` and `B3WorldTransform`** carry world positions/transforms and follow the
+  define: conversions *into* them are implicit (widening), *out* are explicit casts in double mode
+  (lossy narrowing). In single precision they are layout- and source-compatible with the previous
+  `float3`/`B3Transform` API.
+- **Double native libraries ship alongside the single ones** (`box3d_d.dll`, `libbox3d_d.so`,
+  `libbox3d_d.dylib`, Android `libbox3d_d.so`) — the define selects the right one by name at
+  runtime. iOS/WebGL link statically and stay single precision unless you embed the package and
+  swap the archive (see the guide's iOS/WebGL section).
+- **Triple mismatch protection**: Box3D's `b3CreateWorld` precision tripwire, a two-way runtime
+  assert at init (`b3IsDoublePrecision()` vs the define), and a test that fails loudly in CI.
+- Build tooling: every `Box3D.Native~` build script takes `BOX3D_DOUBLE=1`; the CI workflow gained a
+  `precision` input (`single` / `double` / `both`).
+
+### Changed
+- Position-carrying APIs (`Body.Position` / `Body.Transform`, `BodyDef.Position`,
+  `BodyMoveEvent.Transform`, `RayResult.Point`, `ContactHitEvent.Point`, `ExplosionDef.Position`,
+  apply-at-point forces/impulses, debug-draw callbacks) now use `B3Pos` / `B3WorldTransform`.
+  Source-compatible in single precision via implicit conversions.
+- `Determinism.HashState` hashes positions at native width (single-precision hash values are
+  unchanged). Hashes and **recordings (`.rec`) are precision-specific** — a recording made in one
+  precision won't replay in the other; the replayers now say so when a load fails.
+
 ## [0.7.1] — 2026-07-27
 
 ### Added

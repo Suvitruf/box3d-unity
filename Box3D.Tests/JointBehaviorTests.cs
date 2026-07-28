@@ -105,7 +105,7 @@ namespace Box3D.Tests
 
             Body bodyA = CreateDynamicSphere(world, new float3(0f, 4f, 0f), 0.3f);
             Body bodyB = CreateDynamicSphere(world, new float3(1f, 4f, 0f), 0.3f);
-            float initialDistance = math.distance(bodyA.Position, bodyB.Position);
+            float initialDistance = (float)math.distance(bodyA.Position, bodyB.Position);
 
             WeldJointDef def = WeldJointDef.Default;
             def.Base.BodyIdA = bodyA.Id;

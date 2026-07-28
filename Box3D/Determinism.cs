@@ -30,24 +30,20 @@ namespace Box3D
         /// <summary>Hashes raw bytes with box3d's djb2 from the default seed.</summary>
         public static uint Hash(ReadOnlySpan<byte> data) => Hash(HashSeed, data);
 
-        /// <summary>A determinism hash over the bodies' positions and rotations (raw float bits), in the
-        /// order given. The order must be identical across the runs you compare — pass the same fixed body
-        /// list each time. Chains from <paramref name="hash"/> so you can fold in more state if needed.</summary>
+        /// <summary>A determinism hash over the bodies' positions and rotations (raw bits, at the
+        /// build's native precision — double position bits under BOX3D_DOUBLE), in the order given.
+        /// The order must be identical across the runs you compare — pass the same fixed body list
+        /// each time. Chains from <paramref name="hash"/> so you can fold in more state if needed.</summary>
         public static unsafe uint HashState(ReadOnlySpan<Body> bodies, uint hash = HashSeed)
         {
-            float* buffer = stackalloc float[7]; // px py pz | qx qy qz qw
             for (int i = 0; i < bodies.Length; i++)
             {
-                float3 position = bodies[i].Position;
+                // djb2 folds byte-by-byte, so chaining two calls equals one call over the
+                // concatenated bytes — single-precision hash values are unchanged by this split.
+                B3Pos position = bodies[i].Position;
                 quaternion rotation = bodies[i].Rotation;
-                buffer[0] = position.x;
-                buffer[1] = position.y;
-                buffer[2] = position.z;
-                buffer[3] = rotation.value.x;
-                buffer[4] = rotation.value.y;
-                buffer[5] = rotation.value.z;
-                buffer[6] = rotation.value.w;
-                hash = UnsafeBindings.b3Hash(hash, (byte*)buffer, 7 * sizeof(float));
+                hash = UnsafeBindings.b3Hash(hash, (byte*)&position, sizeof(B3Pos));
+                hash = UnsafeBindings.b3Hash(hash, (byte*)&rotation, 4 * sizeof(float));
             }
             return hash;
         }

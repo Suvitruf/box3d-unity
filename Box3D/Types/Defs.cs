@@ -90,7 +90,7 @@ namespace Box3D
     public struct BodyDef
     {
         public BodyType Type;
-        public float3 Position;
+        public B3Pos Position;
         public quaternion Rotation;
         public float3 LinearVelocity;
         public float3 AngularVelocity;

@@ -167,7 +167,7 @@ namespace Box3D.Hybrid
 
         private static Vector3 Tip(Body body, float alongZ)
         {
-            return (Vector3)(body.Position + math.mul(body.Rotation, new float3(0f, 0f, alongZ)));
+            return (Vector3)((float3)body.Position + math.mul(body.Rotation, new float3(0f, 0f, alongZ)));
         }
     }
 }

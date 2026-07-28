@@ -89,7 +89,7 @@ public class Box3DJointsSandbox : MonoBehaviour
     {
         const float ropeLength = 1.5f;
         float halfLink = LinkLength * 0.5f;
-        float3 tipBottom = chainTip.Position - new float3(0f, halfLink, 0f);
+        float3 tipBottom = (float3)chainTip.Position - new float3(0f, halfLink, 0f);
 
         BodyDef ballDef = BodyDef.Default;
         ballDef.Type = BodyType.Dynamic;
@@ -123,7 +123,7 @@ public class Box3DJointsSandbox : MonoBehaviour
         foreach (BodyMoveEvent moveEvent in _world.GetBodyMoveEvents())
         {
             int index = (int)moveEvent.UserData;
-            _visuals[index].SetPositionAndRotation(moveEvent.Transform.Position, moveEvent.Transform.Rotation);
+            _visuals[index].SetPositionAndRotation((Vector3)moveEvent.Transform.Position, moveEvent.Transform.Rotation);
         }
 
         if (_rope)

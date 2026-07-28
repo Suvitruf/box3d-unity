@@ -57,13 +57,13 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(b3PreSolveFcn))]
-        private static NativeBool OnPreSolve(ShapeId shapeIdA, ShapeId shapeIdB, float3 point, float3 normal, void* context)
+        private static NativeBool OnPreSolve(ShapeId shapeIdA, ShapeId shapeIdB, B3Pos point, float3 normal, void* context)
         {
             try
             {
                 PreSolveCallback callback = PreSolves[(uint)context];
                 if (callback == null) return true;
-                return callback(new Shape { Id = shapeIdA }, new Shape { Id = shapeIdB }, point, normal);
+                return callback(new Shape { Id = shapeIdA }, new Shape { Id = shapeIdB }, (float3)point, normal);
             }
             catch (Exception exception)
             {
