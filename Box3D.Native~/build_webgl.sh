@@ -9,8 +9,13 @@
 # WebGL players are single-threaded: the wrapper forces workerCount = 1 there.
 #
 # Environment (optional):
-#   BOX3D_SRC  box3d checkout; auto-probed next to the repo if unset
-#   EMSDK_ENV  path to emsdk_env.sh to source if emcmake is not already on PATH
+#   BOX3D_SRC     box3d checkout; auto-probed next to the repo if unset
+#   EMSDK_ENV     path to emsdk_env.sh to source if emcmake is not already on PATH
+#   BOX3D_DOUBLE  set (any value) to build the DOUBLE-precision variant. Like iOS, WebGL links
+#                 statically as "__Internal", so the double archive keeps the name libbox3d.a and is
+#                 staged under Box3D.Native~/double-staging/WebGL/ — NOT shipped by default. To use double on WebGL,
+#                 EMBED the package, replace Plugins/WebGL/libbox3d.a with this one, and set the
+#                 BOX3D_DOUBLE C# define. See Docs/double-precision-plan.md.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -27,8 +32,10 @@ fi
 [ -f "${BOX3D_SRC:-}/include/box3d/box3d.h" ] || {
     echo "error: box3d checkout not found — set BOX3D_SRC" >&2; exit 1; }
 
-BUILD=build-webgl
-OUT=../Plugins/WebGL
+PREC=""; BUILD=build-webgl; OUT=../Plugins/WebGL
+if [ -n "${BOX3D_DOUBLE:-}" ]; then
+    PREC=-DBOX3D_DOUBLE_PRECISION=ON; BUILD=build-webgl-double; OUT=double-staging/WebGL
+fi
 
 emcmake cmake -S "$BOX3D_SRC" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
@@ -36,7 +43,8 @@ emcmake cmake -S "$BOX3D_SRC" -B "$BUILD" \
   -DBOX3D_DISABLE_SIMD=ON \
   -DBOX3D_SAMPLES=OFF \
   -DBOX3D_UNIT_TESTS=OFF \
-  -DBOX3D_BENCHMARKS=OFF
+  -DBOX3D_BENCHMARKS=OFF \
+  $PREC
 
 cmake --build "$BUILD" -j "$(nproc)"
 

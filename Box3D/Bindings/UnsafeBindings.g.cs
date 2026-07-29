@@ -62,14 +62,14 @@ namespace Box3D
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     [return: NativeTypeName("_Bool")]
-    internal unsafe delegate NativeBool b3PreSolveFcn([NativeTypeName("b3ShapeId")] ShapeId shapeIdA, [NativeTypeName("b3ShapeId")] ShapeId shapeIdB, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 point, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 normal, void* context);
+    internal unsafe delegate NativeBool b3PreSolveFcn([NativeTypeName("b3ShapeId")] ShapeId shapeIdA, [NativeTypeName("b3ShapeId")] ShapeId shapeIdB, B3Pos point, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 normal, void* context);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     [return: NativeTypeName("_Bool")]
     internal unsafe delegate NativeBool b3OverlapResultFcn([NativeTypeName("b3ShapeId")] ShapeId shapeId, void* context);
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-    internal unsafe delegate float b3CastResultFcn([NativeTypeName("b3ShapeId")] ShapeId shapeId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 point, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 normal, float fraction, [NativeTypeName("uint64_t")] ulong userMaterialId, int triangleIndex, int childIndex, void* context);
+    internal unsafe delegate float b3CastResultFcn([NativeTypeName("b3ShapeId")] ShapeId shapeId, B3Pos point, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 normal, float fraction, [NativeTypeName("uint64_t")] ulong userMaterialId, int triangleIndex, int childIndex, void* context);
 
     internal partial struct b3Profile
     {
@@ -267,8 +267,7 @@ namespace Box3D
         [NativeTypeName("b3ShapeId")]
         public ShapeId shapeId;
 
-        [NativeTypeName("b3Pos")]
-        public Unity.Mathematics.float3 point;
+        public B3Pos point;
 
         [NativeTypeName("b3Vec3")]
         public Unity.Mathematics.float3 normal;
@@ -1679,8 +1678,7 @@ namespace Box3D
 
         public B3Aabb aabb;
 
-        [NativeTypeName("b3Pos")]
-        public Unity.Mathematics.float3 origin;
+        public B3Pos origin;
 
         [NativeTypeName("b3Vec3")]
         public Unity.Mathematics.float3 translation;
@@ -1702,8 +1700,7 @@ namespace Box3D
         [NativeTypeName("b3ShapeId")]
         public ShapeId shape;
 
-        [NativeTypeName("b3Pos")]
-        public Unity.Mathematics.float3 point;
+        public B3Pos point;
 
         [NativeTypeName("b3Vec3")]
         public Unity.Mathematics.float3 normal;
@@ -1924,11 +1921,11 @@ namespace Box3D
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("_Bool")]
-        public static extern NativeBool b3IsValidPosition([NativeTypeName("b3Pos")] Unity.Mathematics.float3 p);
+        public static extern NativeBool b3IsValidPosition(B3Pos p);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("_Bool")]
-        public static extern NativeBool b3IsValidWorldTransform([NativeTypeName("b3WorldTransform")] B3Transform t);
+        public static extern NativeBool b3IsValidWorldTransform(B3WorldTransform t);
 
         [NativeTypeName("#define B3_PI 3.14159265359f")]
         public const float B3_PI = 3.14159265359f;
@@ -2045,8 +2042,12 @@ namespace Box3D
         [NativeTypeName("#define B3_MAX_COMPOUND_MESH_MATERIALS 4")]
         public const int B3_MAX_COMPOUND_MESH_MATERIALS = 4;
 
+#if BOX3D_DOUBLE
+        [DllImport(Box3DLibrary.Name, EntryPoint = "b3CreateWorldDoublePrecision", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+#else
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("b3WorldId")]
+#endif
+                [return: NativeTypeName("b3WorldId")]
         public static extern WorldId b3CreateWorld([NativeTypeName("const b3WorldDef *")] WorldDef* def);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -2091,23 +2092,23 @@ namespace Box3D
         public static extern b3TreeStats b3World_OverlapAABB([NativeTypeName("b3WorldId")] WorldId worldId, B3Aabb aabb, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3OverlapResultFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern b3TreeStats b3World_OverlapShape([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3OverlapResultFcn *")] IntPtr fcn, void* context);
+        public static extern b3TreeStats b3World_OverlapShape([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3OverlapResultFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern b3TreeStats b3World_CastRay([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3CastResultFcn *")] IntPtr fcn, void* context);
+        public static extern b3TreeStats b3World_CastRay([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3CastResultFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3RayResult")]
-        public static extern RayResult b3World_CastRayClosest([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter);
+        public static extern RayResult b3World_CastRayClosest([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern b3TreeStats b3World_CastShape([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3CastResultFcn *")] IntPtr fcn, void* context);
+        public static extern b3TreeStats b3World_CastShape([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3CastResultFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern float b3World_CastMover([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3MoverFilterFcn *")] IntPtr fcn, void* context);
+        public static extern float b3World_CastMover([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3MoverFilterFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void b3World_CollideMover([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3PlaneResultFcn *")] IntPtr fcn, void* context);
+        public static extern void b3World_CollideMover([NativeTypeName("b3WorldId")] WorldId worldId, B3Pos origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3PlaneResultFcn *")] IntPtr fcn, void* context);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void b3World_EnableSleeping([NativeTypeName("b3WorldId")] WorldId worldId, [NativeTypeName("_Bool")] NativeBool flag);
@@ -2366,27 +2367,24 @@ namespace Box3D
         public static extern void* b3Body_GetUserData([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("b3Pos")]
-        public static extern Unity.Mathematics.float3 b3Body_GetPosition([NativeTypeName("b3BodyId")] BodyId bodyId);
+        public static extern B3Pos b3Body_GetPosition([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Quat")]
         public static extern Unity.Mathematics.quaternion b3Body_GetRotation([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("b3WorldTransform")]
-        public static extern B3Transform b3Body_GetTransform([NativeTypeName("b3BodyId")] BodyId bodyId);
+        public static extern B3WorldTransform b3Body_GetTransform([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void b3Body_SetTransform([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 position, [NativeTypeName("b3Quat")] Unity.Mathematics.quaternion rotation);
+        public static extern void b3Body_SetTransform([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos position, [NativeTypeName("b3Quat")] Unity.Mathematics.quaternion rotation);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Vec3")]
-        public static extern Unity.Mathematics.float3 b3Body_GetLocalPoint([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 worldPoint);
+        public static extern Unity.Mathematics.float3 b3Body_GetLocalPoint([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos worldPoint);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("b3Pos")]
-        public static extern Unity.Mathematics.float3 b3Body_GetWorldPoint([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 localPoint);
+        public static extern B3Pos b3Body_GetWorldPoint([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 localPoint);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Vec3")]
@@ -2411,7 +2409,7 @@ namespace Box3D
         public static extern void b3Body_SetAngularVelocity([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 angularVelocity);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void b3Body_SetTargetTransform([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3WorldTransform")] B3Transform target, float timeStep, [NativeTypeName("_Bool")] NativeBool wake);
+        public static extern void b3Body_SetTargetTransform([NativeTypeName("b3BodyId")] BodyId bodyId, B3WorldTransform target, float timeStep, [NativeTypeName("_Bool")] NativeBool wake);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Vec3")]
@@ -2419,10 +2417,10 @@ namespace Box3D
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Vec3")]
-        public static extern Unity.Mathematics.float3 b3Body_GetWorldPointVelocity([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 worldPoint);
+        public static extern Unity.Mathematics.float3 b3Body_GetWorldPointVelocity([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos worldPoint);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void b3Body_ApplyForce([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 force, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 point, [NativeTypeName("_Bool")] NativeBool wake);
+        public static extern void b3Body_ApplyForce([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 force, B3Pos point, [NativeTypeName("_Bool")] NativeBool wake);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void b3Body_ApplyForceToCenter([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 force, [NativeTypeName("_Bool")] NativeBool wake);
@@ -2431,7 +2429,7 @@ namespace Box3D
         public static extern void b3Body_ApplyTorque([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 torque, [NativeTypeName("_Bool")] NativeBool wake);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void b3Body_ApplyLinearImpulse([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 impulse, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 point, [NativeTypeName("_Bool")] NativeBool wake);
+        public static extern void b3Body_ApplyLinearImpulse([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 impulse, B3Pos point, [NativeTypeName("_Bool")] NativeBool wake);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void b3Body_ApplyLinearImpulseToCenter([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 impulse, [NativeTypeName("_Bool")] NativeBool wake);
@@ -2456,8 +2454,7 @@ namespace Box3D
         public static extern Unity.Mathematics.float3 b3Body_GetLocalCenterOfMass([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        [return: NativeTypeName("b3Pos")]
-        public static extern Unity.Mathematics.float3 b3Body_GetWorldCenterOfMass([NativeTypeName("b3BodyId")] BodyId bodyId);
+        public static extern B3Pos b3Body_GetWorldCenterOfMass([NativeTypeName("b3BodyId")] BodyId bodyId);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern void b3Body_SetMassData([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3MassData")] MassData massData);
@@ -2570,17 +2567,17 @@ namespace Box3D
         public static extern float b3Body_GetClosestPoint([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Vec3 *")] Unity.Mathematics.float3* result, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 target);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern b3BodyCastResult b3Body_CastRay([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, float maxFraction, [NativeTypeName("b3WorldTransform")] B3Transform bodyTransform);
+        public static extern b3BodyCastResult b3Body_CastRay([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, float maxFraction, B3WorldTransform bodyTransform);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern b3BodyCastResult b3Body_CastShape([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, float maxFraction, [NativeTypeName("_Bool")] NativeBool canEncroach, [NativeTypeName("b3WorldTransform")] B3Transform bodyTransform);
+        public static extern b3BodyCastResult b3Body_CastShape([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation, [NativeTypeName("b3QueryFilter")] QueryFilter filter, float maxFraction, [NativeTypeName("_Bool")] NativeBool canEncroach, B3WorldTransform bodyTransform);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("_Bool")]
-        public static extern NativeBool b3Body_OverlapShape([NativeTypeName("b3BodyId")] BodyId bodyId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3WorldTransform")] B3Transform bodyTransform);
+        public static extern NativeBool b3Body_OverlapShape([NativeTypeName("b3BodyId")] BodyId bodyId, B3Pos origin, [NativeTypeName("const b3ShapeProxy *")] b3ShapeProxy* proxy, [NativeTypeName("b3QueryFilter")] QueryFilter filter, B3WorldTransform bodyTransform);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern int b3Body_CollideMover([NativeTypeName("b3BodyId")] BodyId bodyId, b3BodyPlaneResult* bodyPlanes, int planeCapacity, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3QueryFilter")] QueryFilter filter, [NativeTypeName("b3WorldTransform")] B3Transform bodyTransform);
+        public static extern int b3Body_CollideMover([NativeTypeName("b3BodyId")] BodyId bodyId, b3BodyPlaneResult* bodyPlanes, int planeCapacity, B3Pos origin, [NativeTypeName("const b3Capsule *")] Capsule* mover, [NativeTypeName("b3QueryFilter")] QueryFilter filter, B3WorldTransform bodyTransform);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3ShapeId")]
@@ -2711,7 +2708,7 @@ namespace Box3D
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3WorldCastOutput")]
-        public static extern b3CastOutput b3Shape_RayCast([NativeTypeName("b3ShapeId")] ShapeId shapeId, [NativeTypeName("b3Pos")] Unity.Mathematics.float3 origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation);
+        public static extern b3CastOutput b3Shape_RayCast([NativeTypeName("b3ShapeId")] ShapeId shapeId, B3Pos origin, [NativeTypeName("b3Vec3")] Unity.Mathematics.float3 translation);
 
         [DllImport(Box3DLibrary.Name, CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         [return: NativeTypeName("b3Sphere")]

@@ -14,7 +14,7 @@ namespace Box3D
     public struct BodyMoveEvent
     {
         public IntPtr UserData;
-        public B3Transform Transform;
+        public B3WorldTransform Transform;
         public BodyId BodyId;
         public NativeBool FellAsleep;
     }
@@ -46,7 +46,7 @@ namespace Box3D
         public ShapeId ShapeIdA;
         public ShapeId ShapeIdB;
         public ContactId ContactId;
-        public float3 Point;
+        public B3Pos Point;
         public float3 Normal;
         public float ApproachSpeed;
         public ulong UserMaterialIdA;

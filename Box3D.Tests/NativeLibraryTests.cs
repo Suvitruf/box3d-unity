@@ -16,9 +16,15 @@ namespace Box3D.Tests
         }
 
         [Test]
-        public void NativeBuild_IsSinglePrecision()
+        public void NativeBuild_PrecisionMatchesManagedDefine()
         {
-            Assert.IsFalse(Box3DApi.IsDoublePrecision);
+            // A mismatch means every position-carrying struct has the wrong layout — the same
+            // condition Box3DRuntime guards at init, asserted here so CI fails loudly.
+#if BOX3D_DOUBLE
+            Assert.IsTrue(Box3DApi.IsDoublePrecision, "BOX3D_DOUBLE is defined — the loaded native library must be a double-precision build");
+#else
+            Assert.IsFalse(Box3DApi.IsDoublePrecision, "BOX3D_DOUBLE is not defined — the loaded native library must be a single-precision build");
+#endif
         }
     }
 }

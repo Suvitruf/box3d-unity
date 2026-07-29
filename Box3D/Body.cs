@@ -23,11 +23,11 @@ namespace Box3D
             Id = default;
         }
 
-        public float3 Position => UnsafeBindings.b3Body_GetPosition(Id);
+        public B3Pos Position => UnsafeBindings.b3Body_GetPosition(Id);
 
         public quaternion Rotation => UnsafeBindings.b3Body_GetRotation(Id);
 
-        public B3Transform Transform => UnsafeBindings.b3Body_GetTransform(Id);
+        public B3WorldTransform Transform => UnsafeBindings.b3Body_GetTransform(Id);
 
         public float3 LinearVelocity
         {

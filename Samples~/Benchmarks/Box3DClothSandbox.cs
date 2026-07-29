@@ -148,7 +148,7 @@ public class Box3DClothSandbox : MonoBehaviour
 
         foreach (BodyMoveEvent moveEvent in _world.GetBodyMoveEvents())
         {
-            _positions[(int)moveEvent.UserData] = moveEvent.Transform.Position;
+            _positions[(int)moveEvent.UserData] = (float3)moveEvent.Transform.Position;
         }
     }
 

@@ -43,7 +43,7 @@ ALLOWED = {
     "Unity.Mathematics.float2", "Unity.Mathematics.float3", "Unity.Mathematics.float4",
     "Unity.Mathematics.quaternion",
     "WorldId", "BodyId", "ShapeId", "JointId", "ContactId",
-    "B3Transform", "B3Aabb", "B3Matrix3",
+    "B3Transform", "B3WorldTransform", "B3Pos", "B3Aabb", "B3Matrix3",
     "Sphere", "Capsule", "BoxHull", "Box3DVersion",
     "BodyType", "ShapeType",
     "WorldDef", "BodyDef", "ShapeDef", "CollisionFilter", "SurfaceMaterial", "Capacity",

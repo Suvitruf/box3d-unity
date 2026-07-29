@@ -35,6 +35,31 @@ namespace Box3D.Tests
             AssertSize<BoxHull>(440);
         }
 
+        // Structs carrying a world position (B3Pos / B3WorldTransform) change size under
+        // BOX3D_DOUBLE. Both branches are hand-verified against a native sizeof dump compiled
+        // from the pinned headers in the matching mode (see Docs/double-precision-plan.md).
+        [Test]
+        public void PositionCarryingSizes()
+        {
+#if BOX3D_DOUBLE
+            AssertSize<B3Pos>(24);
+            AssertSize<B3WorldTransform>(40);
+            AssertSize<BodyDef>(120);
+            AssertSize<BodyMoveEvent>(64);
+            AssertSize<RayResult>(80);
+            AssertSize<ExplosionDef>(48);
+            AssertSize<ContactHitEvent>(88);
+#else
+            AssertSize<B3Pos>(12);
+            AssertSize<B3WorldTransform>(28);
+            AssertSize<BodyDef>(104);
+            AssertSize<BodyMoveEvent>(48);
+            AssertSize<RayResult>(64);
+            AssertSize<ExplosionDef>(32);
+            AssertSize<ContactHitEvent>(72);
+#endif
+        }
+
         [Test]
         public void DefSizes()
         {
@@ -43,14 +68,7 @@ namespace Box3D.Tests
             AssertSize<CollisionFilter>(24);
             AssertSize<SurfaceMaterial>(40);
             AssertSize<WorldDef>(144);
-            AssertSize<BodyDef>(104);
             AssertSize<ShapeDef>(112);
-        }
-
-        [Test]
-        public void EventSizes()
-        {
-            AssertSize<BodyMoveEvent>(48);
         }
 
         [Test]

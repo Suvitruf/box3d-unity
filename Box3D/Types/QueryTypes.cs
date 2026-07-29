@@ -22,7 +22,7 @@ namespace Box3D
     public struct RayResult
     {
         public ShapeId ShapeId;
-        public float3 Point;
+        public B3Pos Point;
         public float3 Normal;
         public ulong UserMaterialId;
         public float Fraction;
@@ -62,7 +62,7 @@ namespace Box3D
     public struct ExplosionDef
     {
         public ulong MaskBits;
-        public float3 Position;
+        public B3Pos Position;
         public float Radius;
         public float Falloff;
         public float ImpulsePerArea;

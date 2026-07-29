@@ -15,7 +15,11 @@ namespace Box3D.Tests
         {
             Assert.AreEqual(28, UnsafeUtility.SizeOf<ContactBeginTouchEvent>());
             Assert.AreEqual(28, UnsafeUtility.SizeOf<ContactEndTouchEvent>());
+#if BOX3D_DOUBLE
+            Assert.AreEqual(88, UnsafeUtility.SizeOf<ContactHitEvent>()); // Point is a double B3Pos
+#else
             Assert.AreEqual(72, UnsafeUtility.SizeOf<ContactHitEvent>());
+#endif
             Assert.AreEqual(16, UnsafeUtility.SizeOf<SensorBeginTouchEvent>());
             Assert.AreEqual(16, UnsafeUtility.SizeOf<SensorEndTouchEvent>());
             Assert.AreEqual(16, UnsafeUtility.SizeOf<JointEvent>());

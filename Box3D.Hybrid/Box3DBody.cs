@@ -226,9 +226,11 @@ namespace Box3D.Hybrid
         }
 
         /// <summary>Called by the world after each step to write a body-move event to the Transform.</summary>
-        internal void ApplyMoveEvent(B3Transform moved)
+        internal void ApplyMoveEvent(B3WorldTransform moved)
         {
-            transform.SetPositionAndRotation(moved.Position, moved.Rotation);
+            // (Vector3) narrows in double mode — the component layer is render-space; large-world
+            // users pair BOX3D_DOUBLE with a floating-origin strategy (see the docs).
+            transform.SetPositionAndRotation((Vector3)moved.Position, moved.Rotation);
             transform.hasChanged = false; // our own write must not read back as a user move
         }
 

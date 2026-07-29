@@ -65,6 +65,23 @@ print(f"postprocess: removed {removed_assert} debug-only extern(s)")
 # lives in the hand-written UnsafeBindings.DllName.cs partial.
 text = text.replace('[DllImport("box3d"', "[DllImport(Box3DLibrary.Name")
 
+# Precision tripwire: double-precision box3d exports b3CreateWorld AS b3CreateWorldDoublePrecision
+# (box3d.h renames it via macro so mismatched clients fail to link on the first call every program
+# makes). Mirror that: under BOX3D_DOUBLE the import needs an EntryPoint override.
+create_world = re.search(
+    r"( +)(\[DllImport\(Box3DLibrary\.Name[^\n]*\]\n(?: +\[[^\n]*\]\n)* +public static extern \w+ b3CreateWorld\()",
+    text)
+assert create_world, "postprocess: b3CreateWorld extern not found for the precision tripwire"
+indent, block = create_world.group(1), create_world.group(2)
+attr_end = block.index("]\n") + 1
+attr = block[:attr_end]
+double_attr = attr.replace("[DllImport(Box3DLibrary.Name",
+                           '[DllImport(Box3DLibrary.Name, EntryPoint = "b3CreateWorldDoublePrecision"')
+replacement = (f"#if BOX3D_DOUBLE\n{indent}{double_attr}\n"
+               f"#else\n{indent}{attr}\n#endif\n{indent}{block[attr_end + 1:]}")
+text = text[:create_world.start()] + indent + replacement + text[create_world.end():]
+print("postprocess: added BOX3D_DOUBLE EntryPoint override for b3CreateWorld")
+
 with open(path, "w") as f:
     f.write(text)
 

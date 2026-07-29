@@ -34,7 +34,7 @@ namespace Box3D.Tests
             }
 
             // Resting height = ground top (0.5) + sphere radius (0.5), within contact slop.
-            float3 position = sphereBody.Position;
+            float3 position = (float3)sphereBody.Position;
             Assert.AreEqual(1f, position.y, 0.02f, "sphere should rest on the ground");
             Assert.AreEqual(0f, position.x, 1e-3f);
             Assert.AreEqual(0f, position.z, 1e-3f);

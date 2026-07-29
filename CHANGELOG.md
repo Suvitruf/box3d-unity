@@ -1,72 +1,46 @@
 # Changelog
 
-## [Unreleased]
+## [0.7.2] — 2026-07-28
 
-### Added — water
-- **`Box3DWater`** (Add Component → Box3D → Water, GameObject → Box3D → Water): GPU particle
-  water with a screen-space liquid surface. A box volume fills with fluid on play; a compute
-  position-based-fluids solver (neighbor grid, density constraints, cohesion, XSPH viscosity)
-  collides the particles with the Box3D shapes near the water bounds — spheres, capsules and box
-  hulls exactly, other shapes by bounding box — and hands the push-back to dynamic bodies as
-  impulses plus submersion drag, so props float, bob and get shoved by waves. Rendering splats
-  sphere impostors into per-camera depth/thickness buffers, smooths depth with a bilateral blur
-  and shades a fullscreen surface: refraction of the opaque scene, thickness-based absorption,
-  probe/sky reflections with Fresnel and a specular highlight (URP; needs Depth Texture, Opaque
-  Texture for refraction — otherwise falls back to alpha blending). Designer UX: scene-view
-  handles for the fill volume and simulation bounds, Fill / Splash / Clear Inspector buttons,
-  live particle count, pipeline-setting warnings. Scripting: `SpawnParticles` (recycling
-  emitters), `Fill`, `Clear`, and `ParticleBuffer`/`ActiveParticleRange` for custom renderers.
-  See `Documentation~/water.md`.
-- **Water foam & shoreline merging**: the fluid solver tracks per-particle whitewater (aerated
-  fast water churns into foam and decays back), rendered as a depth-tested foam pass with a
-  noise-broken foam rim at every waterline; water now melts softly into geometry it touches
-  (**Shore Blend**) instead of a hard depth cut, with refraction relaxing to zero at the edge.
-  New **Foam** and **Shore Blend** sliders on `Box3DWater`; foam ships to custom renderers in
-  `VelocityBuffer` (w channel).
-- **Water no longer reads as a pile of balls**: the additive thickness and foam buffers are now
-  Gaussian-smoothed (footprint taken from the smoothed depth) and the per-particle thickness
-  splat swapped for a soft rimless bump, so **Absorption** tints one continuous body of water
-  instead of stamping every impostor as a coin. Foam coverage saturates softly and stays
-  noise-broken and lightly shaded at full strength instead of fusing into a solid white ball,
-  and fast foamy droplets stretch into streaks along their motion so whitewater reads as flying
-  spray — new **Foam Stretch** slider on `Box3DWater` (0 keeps droplets round).
-- **`Box3DWaterfall`** (Add Component → Box3D → Waterfall, GameObject → Box3D → Waterfall): a
-  continuous emitter pouring particles from a rectangular lip along its forward axis — waterfall,
-  fountain or spout depending on how it's aimed. Selecting it previews the gravity flight arc in
-  the scene view; it pours into the scene's `Box3DWater` (recycling the oldest particles on a
-  fixed budget), auto-finds the water, and the tap toggles via `IsFlowing` or an Inspector
-  button. Backed by a new batched `Box3DWater.SpawnParticles(float4[], float4[], int)` overload
-  for custom emitters.
-- **Wind blows on water**: a `Box3DWind` zone overlapping a `Box3DWater` now accelerates the
-  fluid — full strength on surface, spray and foam, fading to nothing in the bulk, gusting with
-  the same Perlin noise the rigid bodies feel. New **Water Influence** slider on `Box3DWind`
-  (0 = rigid-body-only, as before); custom force fields can drive the same input via the new
-  `Box3DWater.AddWind(center, rotation, halfExtents, acceleration)` (up to 8 volumes per step).
-- `Shape.GetHullLocalBounds()` — body-local bounding box of a hull shape's vertices (exact for
-  box hulls), for building oriented-box approximations.
+### Added — opt-in double precision (large worlds)
+- **`BOX3D_DOUBLE`** scripting define enables Box3D's double-precision mode: world **positions**
+  widen to double (accurate far beyond float's ~16 km limit) while velocities, rotations and local
+  geometry stay float. Single precision remains the default and is unchanged. Full guide:
+  [double precision](Documentation~/double-precision.md).
+- **New real types `B3Pos` and `B3WorldTransform`** carry world positions/transforms and follow the
+  define: conversions *into* them are implicit (widening), *out* are explicit casts in double mode
+  (lossy narrowing). In single precision they are layout- and source-compatible with the previous
+  `float3`/`B3Transform` API.
+- **Double native libraries ship alongside the single ones** (`box3d_d.dll`, `libbox3d_d.so`,
+  `libbox3d_d.dylib`, Android `libbox3d_d.so`) — the define selects the right one by name at
+  runtime. iOS/WebGL link statically and stay single precision unless you embed the package and
+  swap the archive (see the guide's iOS/WebGL section).
+- **Triple mismatch protection**: Box3D's `b3CreateWorld` precision tripwire, a two-way runtime
+  assert at init (`b3IsDoublePrecision()` vs the define), and a test that fails loudly in CI.
+- Build tooling: every `Box3D.Native~` build script takes `BOX3D_DOUBLE=1`; the CI workflow gained a
+  `precision` input (`single` / `double` / `both`).
 
-### Added — impact deformation
-- **`Box3DDeformable`** (Add Component → Box3D → Deformable): dents the GameObject's mesh where
-  physics impacts land — vertices near the impact point are pushed along the impact direction with
-  a smooth falloff over **Radius**, scaled by impact speed (**Strength**, capped by **Max Depth**
-  so repeated hits pile up only so far). Works next to any Box3D shape: deformation is applied to
-  a private copy of the visual mesh, so collision geometry, the shared asset and determinism are
-  untouched. Static bodies dent too (walls, floors). **Recovery Speed** heals dents back over time
-  (0 = permanent); **Min Impact Speed** ignores light touches. Designer UX: import-settings and
-  missing-body warnings in the Inspector, play-mode **Test Dent** / **Reset Deformation** buttons,
-  dent-radius gizmo, auto-adds a `Box3DBody` when the hierarchy has none. Scripting:
-  `Dent(point, direction, speed)`, `ResetDeformation()`, `IsDeformed`.
-- **Update Collision** (opt-in on `Box3DDeformable`): rebuilds hull/mesh collision on the same
-  GameObject from the dented vertices, throttled by a rebuild cooldown. Hulls are recomputed
-  convex (dents register where they flatten corners/edges); static mesh shapes take true craters.
-  The replacement shape is created before the old one is destroyed — a failed rebuild keeps the
-  old collision — and userData, hit-event opt-ins and body mass carry over. Off by default since
-  history-dependent collision makes recorded replays diverge; the Inspector explains the limits.
-- **Component-layer impact events**: `Box3DWorld` now reads native contact hit events each step and
-  delivers them as `Box3DHit` (world point, impact direction into the receiver, approach speed,
-  other body) to every `IBox3DHitReceiver` under the body — implement it for impact sounds, decals
-  or particles. Bodies with receivers opt their shapes into hit events automatically; shape
-  userData now carries the owning `Box3DBody` for event routing.
+### Changed
+- Position-carrying APIs (`Body.Position` / `Body.Transform`, `BodyDef.Position`,
+  `BodyMoveEvent.Transform`, `RayResult.Point`, `ContactHitEvent.Point`, `ExplosionDef.Position`,
+  apply-at-point forces/impulses, debug-draw callbacks) now use `B3Pos` / `B3WorldTransform`.
+  Source-compatible in single precision via implicit conversions.
+- `Determinism.HashState` hashes positions at native width (single-precision hash values are
+  unchanged). Hashes and **recordings (`.rec`) are precision-specific** — a recording made in one
+  precision won't replay in the other; the replayers now say so when a load fails.
+
+## [0.7.1] — 2026-07-27
+
+### Added
+- **`DynamicTree`** — box3d's broadphase AABB tree exposed as a standalone spatial index for your own
+  (non-physics) data: a fast "what's near here?" over thousands of moving objects — AI perception,
+  interest management, trigger volumes, culling — without spinning up colliders. Insert proxies
+  (each with a 64-bit `userData`), `MoveProxy` them as things move, and query by region (`Query`),
+  ray (`RayCast`) or swept box (`BoxCast`) — buffer-fill, allocation-free, with `out TreeStats`
+  overloads. Introspection (`ProxyCount` / `Height` / `RootBounds` / `ByteCount` / `Rebuild`) and
+  `Validate`. `IDisposable` (owns native memory). See
+  [Dynamic tree](Documentation~/queries.md#dynamic-tree-standalone-spatial-index) and the
+  [showcase video](https://www.youtube.com/watch?v=awPUUEsWGAg). (`QueryClosest` is not yet wrapped.)
 
 ## [0.7.0] — 2026-07-22
 
@@ -108,13 +82,6 @@
   (bullet) bodies honoring the layer collision matrix, so the rope reacts to everything it sweeps
   past; it ignores collision with its attached bodies by default (filter joints; **Collide With
   Attached** re-enables it). Renders through a LineRenderer whose width follows the rope Radius.
-- **Physics Simulation Scene tool** (**Tools → Box3D → Physics Simulation**, also in the Scene-view
-  tool palette): runs live physics on the **selected** dynamic bodies right in the editor — every
-  other enabled shape is frozen in place as static collision — so props settle into natural rest
-  poses without entering play mode. **Space** starts/stops, **left-drag** grabs a simulating body
-  and pulls it with a soft spring (release mid-swing to throw; frozen geometry blocks the pick, so
-  no grabbing through walls), **Esc** stops. Settled poses land on the real Transforms as a
-  **single undo step**, with prefab-instance overrides recorded.
 
 ### Added — event id → wrapper resolution ([#2](https://github.com/Suvitruf/box3d-unity/issues/2))
 - **`new Body(id)` / `new Shape(id)` / `new Joint(id)`** — the documented way back into the wrapper

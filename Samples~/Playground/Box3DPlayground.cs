@@ -386,12 +386,12 @@ public class Box3DPlayground : MonoBehaviour
         Body hitBody = new Shape { Id = result.ShapeId }.GetBody();
         if (!hitBody.IsValid || hitBody.GetMassData().Mass <= 0f) return; // statics aren't draggable
 
-        _grabDistance = math.distance((float3)ray.origin, result.Point);
+        _grabDistance = (float)math.distance((float3)ray.origin, (float3)result.Point);
 
         MotorJointDef def = MotorJointDef.Default;
         def.Base.BodyIdA = _mouseAnchor.Id;
         def.Base.BodyIdB = hitBody.Id;
-        def.Base.LocalFrameA = new B3Transform { Position = result.Point, Rotation = quaternion.identity };
+        def.Base.LocalFrameA = new B3Transform { Position = (float3)result.Point, Rotation = quaternion.identity };
         def.LinearHertz = DragHertz;
         def.LinearDampingRatio = 1f;
         def.MaxSpringForce = 1000f * hitBody.GetMassData().Mass;
@@ -426,7 +426,7 @@ public class Box3DPlayground : MonoBehaviour
         float3 point;
         if (result.Hit)
         {
-            point = result.Point;
+            point = (float3)result.Point;
         }
         else if (math.abs(ray.direction.y) > 1e-4f) // fall back to the ground plane
         {
@@ -467,7 +467,7 @@ public class Box3DPlayground : MonoBehaviour
         {
             int index = (int)moveEvent.UserData;
             if (index < 0 || index >= _objects.Count) continue;
-            _objects[index].Visual.SetPositionAndRotation(moveEvent.Transform.Position, moveEvent.Transform.Rotation);
+            _objects[index].Visual.SetPositionAndRotation((Vector3)moveEvent.Transform.Position, moveEvent.Transform.Rotation);
         }
 
         ContactEvents contacts = _world.GetContactEvents();

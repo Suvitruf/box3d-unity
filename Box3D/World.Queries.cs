@@ -41,7 +41,7 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(b3CastResultFcn))]
-        private static unsafe float CastCollector(ShapeId shapeId, float3 point, float3 normal,
+        private static unsafe float CastCollector(ShapeId shapeId, B3Pos point, float3 normal,
             float fraction, ulong userMaterialId, int triangleIndex, int childIndex, void* context)
         {
             var ctx = (RayCollectorContext*)context;
@@ -49,7 +49,7 @@ namespace Box3D
             ctx->Buffer[ctx->Count] = new RayHit
             {
                 ShapeId = shapeId,
-                Point = point,
+                Point = (float3)point,
                 Normal = normal,
                 Fraction = fraction,
                 UserMaterialId = userMaterialId,

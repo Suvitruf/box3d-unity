@@ -35,6 +35,9 @@ This project was inspired by, and owes its architecture to, two projects:
   events, delivered as zero-copy spans (the compiler enforces the transient-memory rule).
 - **Queries** — closest-hit and all-hits ray casts, shape casts, AABB/shape overlaps, all
   allocation-free via caller-provided buffers.
+- **Dynamic tree** — box3d's broadphase AABB tree as a standalone spatial index for your own
+  (non-physics) data: a fast "what's near here?" over thousands of moving objects — AI perception,
+  interest management, trigger volumes, culling — without spinning up colliders.
 - **Character mover** — box3d's kinematic capsule toolkit (collide → solve planes → clip velocity)
   with a ready-made sample controller.
 - **Callbacks** — custom collision filtering, pre-solve contact veto, friction/restitution mixing
@@ -164,7 +167,24 @@ ones require the Input System package.
 - [Determinism & replay](Documentation~/determinism-and-replay.md) — record, validate, and scrub replays
 - [Determinism testing](Documentation~/determinism-testing.md) — state hashing for lockstep/cross-platform checks
 - [Performance](Documentation~/performance.md)
+- [Double precision (large worlds)](Documentation~/double-precision.md) — opt-in `BOX3D_DOUBLE` mode
 - [Building the native libraries](Documentation~/building-natives.md)
+
+## Support & community
+
+**Join on [Discord](https://discord.gg/3aDtVmNRMY)** — chat about the project, follow progress, ask
+questions, share ideas, or help test. Everyone curious about Box3D or physics in Unity is welcome.
+
+**Support development** — this is a free, open-source labour of love built in spare time. If you'd
+like to help it move along faster, you can support me on
+[Patreon](https://www.patreon.com/apanasik). Entirely optional — it funds the time spent on the
+bindings and tooling; the package stays free and MIT either way.
+
+## Contributors
+
+- [timskap](https://github.com/timskap) — Editor and tooling: the GameObject creation menu,
+  component icons, inspectors and the rope editor workflow. Mostly focused on making the package
+  more convenient to use in the editor.
 
 ## License
 

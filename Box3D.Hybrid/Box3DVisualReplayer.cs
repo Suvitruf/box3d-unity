@@ -75,7 +75,7 @@ namespace Box3D.Hybrid
             _player = ReplayPlayer.Create(data, WorkerCount);
             if (!_player.IsCreated)
             {
-                Debug.LogError("[Box3DVisualReplayer] the recording data was not a valid replay.", this);
+                Debug.LogError("[Box3DVisualReplayer] the recording data was not a valid replay. Recordings are precision-specific: a .rec written by a single-precision build cannot replay in a BOX3D_DOUBLE build (positions are serialized at native width) and vice versa — re-record with the current build if the precision changed.", this);
                 return;
             }
             _timeStep = _player.GetInfo().TimeStep;
@@ -177,7 +177,7 @@ namespace Box3D.Hybrid
                 if (!target) continue;
                 Body replayBody = _player.GetBody(i);
                 if (!replayBody.IsValid) continue;
-                Vector3 position = replayBody.Position;
+                Vector3 position = (Vector3)replayBody.Position;
                 Quaternion rotation = replayBody.Rotation;
                 target.SetPositionAndRotation(position, rotation);
             }

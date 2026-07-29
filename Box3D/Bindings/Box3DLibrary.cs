@@ -7,7 +7,9 @@ namespace Box3D
     internal static class Box3DLibrary
     {
 #if (UNITY_IOS || UNITY_WEBGL) && !UNITY_EDITOR
-        public const string Name = "__Internal";
+        public const string Name = "__Internal"; // statically linked — precision is fixed by which archive was linked into the player
+#elif BOX3D_DOUBLE
+        public const string Name = "box3d_d"; // double-precision variant, shipped alongside the single build
 #else
         public const string Name = "box3d";
 #endif

@@ -68,7 +68,7 @@ namespace Box3D.Hybrid
             _player = ReplayPlayer.Create(data, WorkerCount);
             if (!_player.IsCreated)
             {
-                Debug.LogError("[Box3DReplayer] the recording data was not a valid replay.", this);
+                Debug.LogError("[Box3DReplayer] the recording data was not a valid replay. Recordings are precision-specific: a .rec written by a single-precision build cannot replay in a BOX3D_DOUBLE build (positions are serialized at native width) and vice versa — re-record with the current build if the precision changed.", this);
                 return;
             }
             _player.EnableShapeDrawing();

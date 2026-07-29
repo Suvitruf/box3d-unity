@@ -76,7 +76,7 @@ namespace Box3D.Hybrid.Editor
                 // Anchor A is relative to shape A's body's center of mass (box3d picks the A/B order).
                 Body bodyA = c.ShapeA.GetBody();
                 if (!bodyA.IsValid) continue;
-                float3 comA = bodyA.GetWorldCenterOfMass();
+                float3 comA = (float3)bodyA.GetWorldCenterOfMass();
 
                 foreach (Manifold m in c.Manifolds)
                 {
