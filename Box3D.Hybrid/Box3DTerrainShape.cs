@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -26,6 +27,42 @@ namespace Box3D.Hybrid
         private bool ApplyHoles = true;
 
         private HeightField _field;
+
+        // Live height-field shapes by id, so systems that meet one through a physics query can
+        // get back to the component and its sampled grid (Box3DWater mirrors it to the GPU for
+        // exact terrain collision instead of the bounding-box approximation).
+        private static readonly Dictionary<ShapeId, Box3DTerrainShape> Registry =
+            new Dictionary<ShapeId, Box3DTerrainShape>();
+
+        private float[] _heights;   // normalized [0, 1] samples, row-major z * SampleCountX + x
+        private int _countX;
+        private int _countZ;
+        private float3 _fieldScale;
+        private float3 _fieldOrigin;
+        private ShapeId _registeredId;
+
+        /// <summary>Maps a height-field shape id from a query back to its live component, or false
+        /// for fields that were created straight through the API.</summary>
+        internal static bool TryGetLiveField(ShapeId id, out Box3DTerrainShape terrain)
+        {
+            if (Registry.TryGetValue(id, out terrain) && terrain && terrain._heights != null) return true;
+            terrain = null;
+            return false;
+        }
+
+        /// <summary>The collision height grid (normalized [0, 1], row-major z * SampleCountX + x),
+        /// as sampled from the terrain — stride and holes applied. Null until the shape exists.</summary>
+        internal float[] SampledHeights => _heights;
+
+        internal int SampleCountX => _countX;
+        internal int SampleCountZ => _countZ;
+
+        /// <summary>World size of one grid cell in x/z; y is the world height the normalized
+        /// samples scale by.</summary>
+        internal float3 FieldScale => _fieldScale;
+
+        /// <summary>World corner the grid spans +X/+Z from (the body origin).</summary>
+        internal float3 FieldOrigin => _fieldOrigin;
 
         /// <summary>Sets the source terrain. Must be set before the body creates the shape (Awake).</summary>
         public void SetTerrain(Terrain terrain)
@@ -92,7 +129,18 @@ namespace Box3D.Hybrid
                 globalMinimumHeight: 0f, globalMaximumHeight: 1f,
                 clockwiseWinding: false, // counter-clockwise = upward-facing surface
                 materialIndices: ApplyHoles ? BuildHoleQuads(data, nx, nz, stride) : null);
-            return body.CreateHeightFieldShape(BuildDef(), _field);
+            Shape shape = body.CreateHeightFieldShape(BuildDef(), _field);
+            if (shape.IsValid)
+            {
+                _heights = heights;
+                _countX = nx;
+                _countZ = nz;
+                _fieldScale = fieldScale;
+                _fieldOrigin = body.GetTransform().Position;
+                _registeredId = shape.Id;
+                Registry[_registeredId] = this;
+            }
+            return shape;
         }
 
         // Per-quad material indices carving painted holes, or null when the terrain has none.
@@ -128,6 +176,9 @@ namespace Box3D.Hybrid
 
         internal override void ReleaseGeometry()
         {
+            Registry.Remove(_registeredId);
+            _registeredId = default;
+            _heights = null;
             if (_field.IsCreated) _field.Destroy();
         }
 

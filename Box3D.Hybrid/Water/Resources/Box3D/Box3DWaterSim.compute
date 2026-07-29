@@ -1,8 +1,9 @@
 // Box3D Water — position-based fluid solver.
 //
 // Particles are solved as an incompressible fluid (density constraint + viscosity smoothing)
-// against analytic colliders extracted from the Box3D world each step (spheres, capsules and
-// oriented boxes). Push-out corrections are accumulated per dynamic body as fixed-point impulses
+// against analytic colliders extracted from the Box3D world each step (spheres, capsules,
+// oriented boxes and terrain height fields). Push-out corrections are accumulated per dynamic
+// body as fixed-point impulses
 // and read back on the CPU, which applies them through the Box3D force API — that reaction is
 // what makes bodies float, drift and get shoved by waves.
 //
@@ -43,17 +44,23 @@ RWStructuredBuffer<int>    _BodyImpulses; // per body: jx jy jz tx ty tz contact
 struct WaterCollider
 {
     float4 rot;      // world rotation quaternion of the owning body
-    float4 pos;      // xyz: world center (sphere/box) or segment start (capsule)
-    float4 data;     // sphere: x=radius | capsule: xyz=segment end, w=radius | box: xyz=half extents
+    float4 pos;      // xyz: world center (sphere/box), segment start (capsule) or grid corner (terrain)
+    float4 data;     // sphere: x=radius | capsule: xyz=segment end, w=radius
+                     // box: xyz=half extents, w=1 marks a world-AABB approximation (top face only)
+                     // terrain: xz=cell size, y=height scale, w=grid rows (countZ)
     float4 velLin;   // body linear velocity (xyz)
     float4 velAng;   // body angular velocity (xyz)
     float4 bodyPos;  // body origin, for torque arms
-    int type;        // 0 sphere, 1 capsule, 2 box
+    int type;        // 0 sphere, 1 capsule, 2 box, 3 terrain height field
     int bodyIndex;   // slot in _BodyImpulses, -1 for static/kinematic
-    int pad0;
-    int pad1;
+    int aux0;        // terrain: first sample in _TerrainHeights
+    int aux1;        // terrain: samples per row (countX)
 };
 StructuredBuffer<WaterCollider> _Colliders;
+
+// Normalized [0, 1] height grids of every terrain collider, packed back to back (row-major,
+// z * countX + x from the field corner); aux0/aux1 above index into it.
+StructuredBuffer<float> _TerrainHeights;
 
 cbuffer Params
 {
@@ -310,30 +317,63 @@ float3 ResolveColliders(float3 p)
                 push = n * pen;
             }
         }
-        else // oriented box
+        else if (col.type == 2) // oriented box
         {
             float3 lp = RotateByQuatInv(col.rot, p - col.pos.xyz);
             float3 he = col.data.xyz + pr;
-            float3 q = abs(lp) - he;
-            float outside = length(max(q, 0.0));
-            float inside = min(max(q.x, max(q.y, q.z)), 0.0);
-            float sd = outside + inside;
-            if (sd < 0.0)
+            if (col.data.w > 0.5)
             {
-                float3 ln;
-                if (outside > 0.0)
+                // A world-AABB approximation of a complex shape (data.w = 1). Such a box is
+                // usually far bigger than the real geometry — a road spline's box swallows half
+                // the village — so of its faces only the top acts: a thin catcher shell that
+                // water can land on (the CFL clamp caps a substep move at one smoothing radius,
+                // so falling water cannot jump it). Sides and bottom stay open — they would dam
+                // water at invisible walls, or crush it against exact geometry (the terrain)
+                // running through the box, which pumps the pond dry via the density solver.
+                float below = he.y - lp.y; // depth below the inflated top plane
+                if (below >= 0.0 && below <= _SmoothingRadius && all(abs(lp.xz) < he.xz))
                 {
-                    ln = normalize(max(q, 0.0)) * sign(lp);
+                    push = float3(0.0, below, 0.0); // world AABBs carry identity rotation
                 }
-                else
+            }
+            else // a real box hull: solid — push out through the nearest face
+            {
+                float3 q = abs(lp) - he;
+                float sd = min(max(q.x, max(q.y, q.z)), 0.0); // < 0 only when inside
+                if (sd < 0.0)
                 {
-                    // Fully inside: exit through the nearest face.
                     float3 dist = he - abs(lp);
-                    ln = dist.x < dist.y && dist.x < dist.z ? float3(sign(lp.x), 0, 0)
+                    float3 ln = dist.x < dist.y && dist.x < dist.z ? float3(sign(lp.x), 0, 0)
                        : dist.y < dist.z ? float3(0, sign(lp.y), 0)
                        : float3(0, 0, sign(lp.z));
+                    push = RotateByQuat(col.rot, ln * -sd);
                 }
-                push = RotateByQuat(col.rot, ln * -sd);
+            }
+        }
+        else // terrain height field: bilinear height surface, open past the grid's edges
+        {
+            float3 local = p - col.pos.xyz;
+            float2 f = local.xz / float2(col.data.x, col.data.z);
+            float2 hi = float2(col.aux1 - 1, (int)col.data.w - 1);
+            if (all(f >= 0.0) && all(f <= hi))
+            {
+                int2 cell = min((int2)f, (int2)(hi - 1.0));
+                float2 t = f - (float2)cell;
+                int first = col.aux0 + cell.y * col.aux1 + cell.x;
+                float h00 = _TerrainHeights[first];
+                float h10 = _TerrainHeights[first + 1];
+                float h01 = _TerrainHeights[first + col.aux1];
+                float h11 = _TerrainHeights[first + col.aux1 + 1];
+
+                float height = lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y) * col.data.y;
+                // Normal from the patch gradient, so water slides down slopes instead of
+                // stacking on them; penetration is the vertical gap projected onto it.
+                float3 n = normalize(float3(
+                    (lerp(h00, h01, t.y) - lerp(h10, h11, t.y)) * col.data.y / col.data.x,
+                    1.0,
+                    (lerp(h00, h10, t.x) - lerp(h01, h11, t.x)) * col.data.y / col.data.z));
+                float pen = pr - (local.y - height) * n.y;
+                if (pen > 0.0) push = n * pen;
             }
         }
 

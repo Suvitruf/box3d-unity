@@ -7,10 +7,10 @@ namespace Box3D.Hybrid
 {
     /// <summary>Particle-based water simulated on the GPU and rendered as a screen-space liquid
     /// surface. The box volume fills with fluid particles on play; they collide with every Box3D
-    /// shape near the water bounds (spheres, capsules and boxes exactly, complex shapes as their
-    /// bounding box) and push dynamic bodies back, so props float, bob and get carried by the
-    /// flow. Needs compute-shader support and a URP camera with Depth Texture on (enable Opaque
-    /// Texture too for refraction).</summary>
+    /// shape near the water bounds (spheres, capsules, boxes and <see cref="Box3DTerrainShape"/>
+    /// terrains exactly, other complex shapes as their bounding box) and push dynamic bodies back,
+    /// so props float, bob and get carried by the flow. Needs compute-shader support and a URP
+    /// camera with Depth Texture on (enable Opaque Texture too for refraction).</summary>
     [Icon("Packages/com.suvitruf.box3d/Box3D.Hybrid.Editor/Icons/Box3DWater.png")]
     [AddComponentMenu("Box3D/Water")]
     [DefaultExecutionOrder(-50)] // after Box3DWorld (-100): fresh transforms in, forces land next step
@@ -58,7 +58,7 @@ namespace Box3D.Hybrid
         [SerializeField, Range(0f, 10f), Tooltip("Water resistance on submerged bodies — higher makes them settle into a calm float sooner.")]
         private float BodyDrag = 2f;
 
-        [SerializeField, Tooltip("Collide with mesh, height-field and compound shapes using their bounding box (exact support: spheres, capsules, boxes and box hulls).")]
+        [SerializeField, Tooltip("Let water land on the top of mesh, compound and component-less height-field shapes' bounding boxes (exact support: spheres, capsules, boxes, box hulls and Box3DTerrainShape terrains). Only the top face acts — the box of a sprawling mesh is far bigger than its geometry, and solid sides would dam water at invisible walls.")]
         private bool ApproximateComplexShapes = true;
 
         [Header("Solver")]
@@ -128,6 +128,7 @@ namespace Box3D.Hybrid
         private ComputeBuffer _gridNext;
         private ComputeBuffer _colliders;
         private ComputeBuffer _bodyImpulses;
+        private ComputeBuffer _terrainHeights;
 
         private int _kClearGrid, _kPredict, _kBuildGrid, _kLambda, _kDelta, _kApply, _kUpdateVel, _kFinalize;
 
@@ -143,11 +144,15 @@ namespace Box3D.Hybrid
         private struct GpuCollider
         {
             public float4 Rot, Pos, Data, VelLin, VelAng, BodyPos;
-            public int Type, BodyIndex, Pad0, Pad1;
+            public int Type, BodyIndex, Aux0, Aux1; // aux: terrain heights offset / samples per row
         }
 
         private readonly ShapeId[] _overlap = new ShapeId[1024];
         private readonly GpuCollider[] _colliderStage = new GpuCollider[MaxColliders];
+
+        // Terrain height grids the water has met, packed back to back into _terrainHeights;
+        // the value is each grid's first slot in the buffer.
+        private readonly Dictionary<Box3DTerrainShape, int> _terrainSlots = new Dictionary<Box3DTerrainShape, int>();
         private readonly Dictionary<Body, int> _bodySlots = new Dictionary<Body, int>();
         private Body[] _bodyStage = new Body[MaxBodies];
         private int _colliderCount;
@@ -256,6 +261,7 @@ namespace Box3D.Hybrid
             _gridNext = new ComputeBuffer(_capacity, 4);
             _colliders = new ComputeBuffer(MaxColliders, 112);
             _bodyImpulses = new ComputeBuffer(MaxBodies * 8, 4);
+            BindTerrainHeights(1); // placeholder until a terrain is met — the kernel needs a valid binding
 
             _spawnPositions = new float4[_capacity];
             _spawnVelocities = new float4[_capacity];
@@ -289,8 +295,47 @@ namespace Box3D.Hybrid
             _gridNext?.Release(); _gridNext = null;
             _colliders?.Release(); _colliders = null;
             _bodyImpulses?.Release(); _bodyImpulses = null;
+            _terrainHeights?.Release(); _terrainHeights = null;
+            _terrainSlots.Clear();
             _activeRange = 0;
             _spawnCursor = 0;
+        }
+
+        // (Re)creates the terrain heights buffer at the given float count and binds it to the
+        // collision kernel (ApplyDelta is the only one that resolves colliders).
+        private void BindTerrainHeights(int count)
+        {
+            _terrainHeights?.Release();
+            _terrainHeights = new ComputeBuffer(count, 4);
+            _compute.SetBuffer(_kApply, "_TerrainHeights", _terrainHeights);
+        }
+
+        // The first slot of this terrain's grid in the heights buffer, uploading it on first
+        // sight. Terrains are static and rare, so the repack runs about once per terrain.
+        private int TerrainHeightsOffset(Box3DTerrainShape terrain)
+        {
+            if (_terrainSlots.TryGetValue(terrain, out int known)) return known;
+
+            var terrains = new List<Box3DTerrainShape>();
+            foreach (Box3DTerrainShape t in _terrainSlots.Keys)
+            {
+                if (t && t.SampledHeights != null) terrains.Add(t); // drop destroyed terrains
+            }
+            terrains.Add(terrain);
+            _terrainSlots.Clear();
+
+            int total = 0;
+            foreach (Box3DTerrainShape t in terrains) total += t.SampledHeights.Length;
+            BindTerrainHeights(total);
+
+            int cursor = 0;
+            foreach (Box3DTerrainShape t in terrains)
+            {
+                _terrainSlots[t] = cursor;
+                _terrainHeights.SetData(t.SampledHeights, 0, cursor, t.SampledHeights.Length);
+                cursor += t.SampledHeights.Length;
+            }
+            return _terrainSlots[terrain];
         }
 
         // ------------------------------------------------------------------ emission
@@ -533,6 +578,22 @@ namespace Box3D.Hybrid
                         col.Data = new float4((local.UpperBound - local.LowerBound) * 0.5f, 0f);
                         break;
                     }
+                    case ShapeType.HeightField:
+                    {
+                        // Terrain collides exactly: the component's sampled grid rides on the GPU
+                        // and is bilinearly sampled per particle. Fields with no live
+                        // Box3DTerrainShape (created straight through the API) have no grid to
+                        // sample and keep the bounding-box treatment below.
+                        if (!Box3DTerrainShape.TryGetLiveField(_overlap[i], out Box3DTerrainShape terrain)) goto default;
+                        float3 fieldScale = terrain.FieldScale;
+                        col.Type = 3;
+                        col.Rot = new float4(0f, 0f, 0f, 1f);
+                        col.Pos = new float4(terrain.FieldOrigin, 0f);
+                        col.Data = new float4(fieldScale, terrain.SampleCountZ);
+                        col.Aux0 = TerrainHeightsOffset(terrain);
+                        col.Aux1 = terrain.SampleCountX;
+                        break;
+                    }
                     default:
                     {
                         if (!ApproximateComplexShapes) continue;
@@ -540,7 +601,9 @@ namespace Box3D.Hybrid
                         col.Type = 2;
                         col.Rot = new float4(0f, 0f, 0f, 1f);
                         col.Pos = new float4((world.LowerBound + world.UpperBound) * 0.5f, 0f);
-                        col.Data = new float4((world.UpperBound - world.LowerBound) * 0.5f, 0f);
+                        // w = 1: a world-AABB approximation — only its top face acts on the
+                        // water (see the box branch in Box3DWaterSim.compute).
+                        col.Data = new float4((world.UpperBound - world.LowerBound) * 0.5f, 1f);
                         break;
                     }
                 }
