@@ -69,6 +69,11 @@
       "displayName": "Playground",
       "description": "Interactive sandbox: spawn textured objects from a menu, drag/throw with the mouse, right-click explosions, a seesaw, a conveyor belt, impact flashes and a live step-time readout. Requires the Input System package.",
       "path": "Samples~/Playground"
+    },
+    {
+      "displayName": "Physics Water",
+      "description": "GPU particle water (Box3DWater): a pool with floating crates, a beach ball and a sinking iron block, a waterfall and a wind zone, plus fill / drain / splash controls and mouse-drag throwing. Water surface rendering requires URP with Depth Texture (Opaque Texture for refraction).",
+      "path": "Samples~/PhysicsWater"
     }
   ]
 }
