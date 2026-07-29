@@ -18,10 +18,9 @@ If you know Unity's physics components, you already know these:
 | `Box3DCapsuleShape` | `CapsuleCollider` | A capsule shape (radius, height, axis). |
 | `Box3DHullShape` | convex `MeshCollider` | Convex hull from a mesh's vertices; works on dynamic bodies. |
 | `Box3DMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
-| `Box3DTerrainShape` | `TerrainCollider` | Height field from a Unity Terrain, with painted-hole and downsampling support; **static bodies only**. |
 | `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. |
 | `Box3DExplosion` | — | Radial impulse burst with radius + falloff. |
-| `Box3DDeformable` | — | Dents the visual mesh where impacts land; optional healing. |
+| `Box3DWaterVolume` | — | Buoyancy volume: bodies float/sink by density, with drag and current. |
 | `Box3DRope` | — | Source 2-style cable: live editor preview, bake static or simulate in game. |
 
 ## Quick start
@@ -140,48 +139,27 @@ Scene-authorable force fields — select one to see its gizmos:
 - **`Box3DWind`** — a box volume that pushes every dynamic body inside along the object's forward
   (+Z) axis each step; rotate the object to aim it. **Strength** is newtons (negative blows
   backward); **Ignore Mass** applies it as acceleration so light and heavy bodies drift equally;
-  **Gust Amplitude** / **Gust Frequency** add Perlin-noise gusting. The zone also blows the scene's
-  `Box3DWater`: fluid at the surface (and foam) gets **Strength × Water Influence** as
-  acceleration, fading to nothing below the surface — 0 leaves the water untouched. Gizmos show
-  the zone and a grid of arrows whose length follows the live gust strength in play mode.
+  **Gust Amplitude** / **Gust Frequency** add Perlin-noise gusting. Gizmos show the zone and a grid
+  of arrows whose length follows the live gust strength in play mode.
 - **`Box3DExplosion`** — a radial impulse burst (native `World.Explode`) at the object's position:
   full **Impulse Per Area** inside **Radius**, fading to zero over **Falloff** beyond it. Trigger
   with `Explode()` from code, the Inspector's **Explode** button, or **Explode On Enable** for
   spawned prefabs. Gizmos show both radii and the blast rays.
+- **`Box3DWaterVolume`** — a buoyancy volume (game water). Dynamic bodies inside get Archimedes buoyancy
+  at the center of their submerged region (tilted floaters right themselves), depth-scaled
+  linear/angular drag, and an optional **Current** flow. Bodies float or sink by their own shape
+  density vs the water's **Density** (1000 = water). **Fill** sets how much of the zone holds water
+  — raise `FillLevel` at runtime to fill a pool; settled floaters sleep, a moving surface wakes
+  them. The zone is world-axis-aligned (water is horizontal). Submersion is estimated per shape
+  AABB — exact for boxes, gameplay-close elsewhere. Optional, all Inspector-configurable:
+  deterministic sine **waves** (`SampleSurfaceY(x, z)` exposes the same surface to your visuals, so
+  a wave mesh can match what bodies feel; waves keep floaters awake), an **Entry Slap** that sheds a
+  fraction of vertical speed on first contact (belly-flop physics), and **`BodyEntered` /
+  `BodyExited` events** for splashes and SFX. This is rigid-body water: no free-surface fluid —
+  splashes are a render-side effect you hook to the events (see the Water sample scene). At
+  Fill = 1 wave crests clamp to the zone top — water never exceeds the volume.
 
-Both live under **Add Component → Box3D → Forces** and **GameObject → Box3D**.
-
-## Deformation
-
-`Box3DDeformable` (**Add Component → Box3D → Deformable**) dents the GameObject's mesh where
-physics impacts land: vertices near the impact point are pushed along the impact direction,
-deepest at the point and fading to zero at **Radius**, scaled by the impact speed. Put it next to
-the `MeshFilter` on a body with any Box3D shape — the shape type doesn't matter, since the dent is
-applied to a private copy of the visual mesh (the shared asset and the collision geometry are
-never touched, so determinism and replay stay exact). Static bodies work too, so walls and floors
-can dent.
-
-- **Strength** is dent depth in meters per m/s of impact speed; **Max Depth** caps how far any
-  vertex can pile up over repeated hits, so the mesh never folds through itself.
-- **Min Impact Speed** ignores light touches (the world already skips impacts below its ~1 m/s
-  hit-event threshold).
-- **Recovery Speed** heals dents back at that many m/s — 0 leaves them permanent (crumpled
-  metal); a high value reads as rubber.
-- The mesh must have **Read/Write** enabled; the Inspector warns when it isn't, and its play-mode
-  **Test Dent** / **Reset Deformation** buttons let you tune dents without staging collisions.
-- **Update Collision** (off by default) rebuilds hull/mesh collision on the same GameObject from
-  the dented vertices, throttled by **Rebuild Cooldown**. Physics honesty: hulls stay convex, so
-  dents register only where they flatten corners or edges (a crushed can rests differently); a
-  static `Box3DMeshShape` takes true craters (balls roll into the dented floor). Box, sphere and
-  capsule shapes can't change. Because collision then depends on impact history, recorded replays
-  diverge — leave it off when you rely on determinism.
-- From code: `Dent(point, direction, speed)` for scripted damage, `ResetDeformation()`,
-  `IsDeformed` for damage states.
-
-Under the hood the body opts its shapes into native hit events and forwards each impact to every
-`IBox3DHitReceiver` on the body (same subtree rules as shapes). Implement that interface yourself
-for impact sounds, decals or particles — `Box3DHit` carries the world-space point, the impact
-direction into your surface, the approach speed and the other body.
+All live under **Add Component → Box3D → Forces**; Wind and Explosion also in **GameObject → Box3D**.
 
 ## Rope
 
@@ -204,27 +182,6 @@ static collision, so the rope hangs over geometry exactly as it will in play mod
 
 Rendering goes through the rope's LineRenderer (style its material/width freely); the simulation
 drives its points every frame.
-
-## Settling props: the Physics Simulation tool
-
-Instead of nudging crates by hand until they look "dropped", let the solver place them:
-**Tools → Box3D → Physics Simulation** (also in the Scene-view tool palette). Select the props to
-settle and press **Space** (or the ▶ button in the Scene-view panel):
-
-- The **selected** dynamic bodies simulate live in the Scene view; every other enabled shape is
-  frozen at its current pose as static collision. It's the rope preview's recipe — a real Box3D
-  world built from the same shapes, damping and masses — so what settles here is what play mode
-  would produce.
-- **Left-drag** a simulating body to grab it: it hangs from the grab point and follows the cursor
-  on a soft spring at its original pick depth. Release mid-swing to throw it. Frozen geometry
-  blocks the pick, so you can't grab objects through walls.
-- **Space** (or ■, or **Esc**) stops. The settled poses are written to the real Transforms as
-  **one undo step** — a single undo restores every prop — and prefab instances get their
-  overrides recorded.
-
-Selection is designer-friendly: pick a parent group to simulate everything under it, or a visual
-child mesh and the owning body still counts. Only **Dynamic** bodies take part. Joint components
-are not replicated in the preview world yet — jointed assemblies settle as free bodies.
 
 ## Tooling components
 

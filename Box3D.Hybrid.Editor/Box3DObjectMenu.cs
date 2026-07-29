@@ -68,6 +68,13 @@ namespace Box3D.Hybrid.Editor
             Place(go, command, "Create Box3D Explosion");
         }
 
+        [MenuItem(Root + "Water Volume", false, 33)]
+        private static void CreateWater(MenuCommand command)
+        {
+            var go = new GameObject("Water Volume", typeof(Box3DWaterVolume));
+            Place(go, command, "Create Box3D Water Volume");
+        }
+
         [MenuItem(Root + "Rope", false, 32)]
         private static void CreateRope(MenuCommand command)
         {
