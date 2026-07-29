@@ -76,7 +76,7 @@ namespace Box3D.Hybrid.Editor
                 // Chase the cursor with a critically-damped lag; the kinematic anchor then drags
                 // the body through the ball joint at solver strength — soft feel, no explosions.
                 float chase = 1f - Mathf.Exp(-deltaTime / GrabSmoothTime);
-                float3 next = math.lerp(_grabAnchor.Position, _grabTarget, chase);
+                float3 next = math.lerp((float3)_grabAnchor.Position, _grabTarget, chase);
                 _grabAnchor.SetTargetTransform(
                     new B3Transform { Position = next, Rotation = quaternion.identity },
                     deltaTime, wake: true);
@@ -92,7 +92,7 @@ namespace Box3D.Hybrid.Editor
             foreach (Entry entry in _entries)
             {
                 if (!entry.Component) continue; // deleted mid-simulation
-                entry.Component.transform.SetPositionAndRotation(entry.Body.Position, entry.Body.Rotation);
+                entry.Component.transform.SetPositionAndRotation((Vector3)entry.Body.Position, entry.Body.Rotation);
             }
         }
 
@@ -195,9 +195,11 @@ namespace Box3D.Hybrid.Editor
                 Transform shapeTransform = shape.transform;
                 float3 localPosition = root.InverseTransformPoint(shapeTransform.position);
                 quaternion localRotation = math.mul(bodyInverse, (quaternion)shapeTransform.rotation);
-                shape.CreateDetachedShape(body, localPosition, localRotation);
-                _replicated.Add(shape);
-                attached++;
+                Shape created = shape.CreateDetachedShape(body, localPosition, localRotation);
+                _replicated.Add(shape); // its detached geometry is released either way
+                // Only count shapes that actually created (an unreadable mesh fails) — a body
+                // with zero real shapes must not simulate and free-fall through the floor.
+                if (created.IsValid) attached++;
             }
 
             if (attached == 0)

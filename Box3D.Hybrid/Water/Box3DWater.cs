@@ -547,8 +547,9 @@ namespace Box3D.Hybrid
             for (int i = 0; i < shapeCount && _colliderCount < MaxColliders; i++)
             {
                 var shape = new Shape(_overlap[i]);
+                if (shape.IsSensor()) continue; // sensors are non-solid — no damming, no coupling
                 Body body = shape.GetBody();
-                B3Transform tf = body.GetTransform();
+                B3Transform tf = body.GetTransform().ToB3Transform();
                 var col = new GpuCollider { Rot = new float4(tf.Rotation.value) };
 
                 switch (shape.GetShapeType())
@@ -627,7 +628,7 @@ namespace Box3D.Hybrid
                     col.BodyIndex = slot;
                     col.VelLin = new float4(body.LinearVelocity, 0f);
                     col.VelAng = new float4(body.AngularVelocity, 0f);
-                    col.BodyPos = new float4(body.Position, 0f);
+                    col.BodyPos = new float4((float3)body.Position, 0f);
                 }
 
                 _colliderStage[_colliderCount++] = col;

@@ -105,10 +105,20 @@ namespace Box3D.Hybrid
 
         private static void ReleaseTargets(CameraTargets t)
         {
-            if (t.Depth) t.Depth.Release();
-            if (t.Thickness) t.Thickness.Release();
-            if (t.Foam) t.Foam.Release();
-            if (t.BlurTmp) t.BlurTmp.Release();
+            DestroyTarget(ref t.Depth);
+            DestroyTarget(ref t.Thickness);
+            DestroyTarget(ref t.Foam);
+            DestroyTarget(ref t.BlurTmp);
+        }
+
+        // Release frees the GPU memory but leaves a dead RenderTexture object behind — every
+        // resize would strand four of them per camera until scene unload. Destroy the object too.
+        private static void DestroyTarget(ref RenderTexture target)
+        {
+            if (!target) return;
+            target.Release();
+            Object.Destroy(target);
+            target = null;
         }
 
         private void OnBeginCamera(ScriptableRenderContext context, Camera camera)

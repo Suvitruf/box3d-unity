@@ -136,7 +136,7 @@ namespace Box3D.Hybrid
                 _countX = nx;
                 _countZ = nz;
                 _fieldScale = fieldScale;
-                _fieldOrigin = body.GetTransform().Position;
+                _fieldOrigin = (Unity.Mathematics.float3)body.GetTransform().Position;
                 _registeredId = shape.Id;
                 Registry[_registeredId] = this;
             }

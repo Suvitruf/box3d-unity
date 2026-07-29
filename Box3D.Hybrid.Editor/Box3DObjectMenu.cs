@@ -87,14 +87,14 @@ namespace Box3D.Hybrid.Editor
             Place(go, command, "Create Box3D Rope");
         }
 
-        [MenuItem(Root + "Water", false, 33)]
+        [MenuItem(Root + "Water", false, 34)]
         private static void CreateWater(MenuCommand command)
         {
             var go = new GameObject("Water", typeof(Box3DWater));
             Place(go, command, "Create Box3D Water");
         }
 
-        [MenuItem(Root + "Waterfall", false, 34)]
+        [MenuItem(Root + "Waterfall", false, 35)]
         private static void CreateWaterfall(MenuCommand command)
         {
             var go = new GameObject("Waterfall", typeof(Box3DWaterfall));

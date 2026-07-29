@@ -156,12 +156,12 @@ namespace Box3D.Hybrid
                 Box3DBody bodyB = BodyFromShape(hitEvent.ShapeIdB);
                 if (bodyA && bodyA.WantsHits)
                 {
-                    bodyA.DispatchHit(new Box3DHit { Point = hitEvent.Point, Direction = -hitEvent.Normal,
+                    bodyA.DispatchHit(new Box3DHit { Point = (Vector3)hitEvent.Point, Direction = -hitEvent.Normal,
                         ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyB });
                 }
                 if (bodyB && bodyB.WantsHits)
                 {
-                    bodyB.DispatchHit(new Box3DHit { Point = hitEvent.Point, Direction = hitEvent.Normal,
+                    bodyB.DispatchHit(new Box3DHit { Point = (Vector3)hitEvent.Point, Direction = hitEvent.Normal,
                         ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyA });
                 }
             }
