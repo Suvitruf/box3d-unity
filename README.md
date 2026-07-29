@@ -25,8 +25,9 @@ This project was inspired by, and owes its architecture to, two projects:
 - **World & bodies** — static/kinematic/dynamic bodies, full body API (velocities, forces, mass,
   damping, per-axis motion locks, bullets/CCD, gravity scale).
 - **Shapes** — sphere, capsule, convex hull (with cylinder/cone/rock/point-cloud builders),
-  triangle mesh, height field, compound. Clear, documented geometry lifetime rules. Concave objects:
-  triangle meshes for static geometry, compounds of convex parts for dynamic bodies
+  triangle mesh, height field (buildable straight from a Unity Terrain, painted holes included),
+  compound. Clear, documented geometry lifetime rules. Concave objects: triangle meshes for static
+  geometry, compounds of convex parts for dynamic bodies
   ([details](Documentation~/shapes-and-geometry.md#concave-objects)).
 - **Joints** — all nine box3d joints: distance, motor, filter, parallel, prismatic, revolute,
   spherical (cone/twist limits), weld, wheel (suspension + steering + drive) — each with its full
@@ -50,8 +51,14 @@ This project was inspired by, and owes its architecture to, two projects:
   across worker counts), save it, and scrub the replay frame by frame with divergence detection —
   either as wireframes or played back on your real scene objects. For lockstep/rollback netcode and
   bug repro. No other Unity physics wrapper ships this.
-- **Extras** — explosions, wind, water buoyancy volumes (waves, splashing events), conveyor
-  surface materials.
+- **Water** — GPU particle water: a position-based fluid simulated in compute shaders that fills
+  pools, pours from waterfalls, flows around your Box3D shapes (terrain included) and carries
+  floating bodies back — rendered as a URP screen-space liquid surface with refraction, foam and
+  spray. Plus a cheap analytic buoyancy volume (Archimedes floating, waves, splash events) for
+  pool-style game water ([guide](Documentation~/water.md)).
+- **Extras** — explosions, wind (it grips the water surface too), impact-dent deformable meshes,
+  conveyor surface materials, and a Scene-view physics simulation tool for settling props in edit
+  mode.
 - **Multithreading** — box3d's internal scheduler, configurable worker count per world.
 - **Component layer (experimental)** — author bodies and shapes in the Inspector, mirroring
   Unity's Rigidbody/Collider model (see the docs).
@@ -146,7 +153,8 @@ world.Destroy();
 
 See `Documentation~/getting-started.md` for the full walkthrough, and install the **samples** from
 the Package Manager window: an interactive playground, basic simulation, joints, mouse drag,
-character controller, a drivable vehicle, and benchmark scenes comparing against PhysX — including a
+character controller, a drivable vehicle, two water scenes (a fillable buoyancy pool and a GPU
+particle water pool with a waterfall), and benchmark scenes comparing against PhysX — including a
 [16,290-box pyramid stress test](https://www.youtube.com/watch?v=BtdMbw97Zds) you can smash by
 throwing spheres.
 The sample scenes assume URP (they render fine elsewhere, minus materials), and the interactive
