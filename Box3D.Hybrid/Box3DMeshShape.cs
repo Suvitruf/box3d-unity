@@ -55,6 +55,41 @@ namespace Box3D.Hybrid
             return body.CreateMeshShape(BuildDef(), _mesh);
         }
 
+        // True crater collision from the dented vertices, reusing the visual mesh's topology.
+        // The old TriangleMesh is referenced by the old shape, so it is stashed here and freed
+        // in ReleaseRebuiltGeometry once the base has destroyed that shape.
+        private TriangleMesh _preRebuildMesh;
+
+        internal override Shape CreateRebuiltShape(Vector3[] vertices, int[] triangles)
+        {
+            if (vertices.Length < 3 || triangles == null || triangles.Length < 3) return default;
+
+            var points = new float3[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                points[i] = AttachedPosition + math.mul(AttachedRotation, ((float3)vertices[i] + LocalCenter) * AttachedScale);
+            }
+
+            TriangleMesh rebuilt = TriangleMesh.Create(points, triangles);
+            if (!rebuilt.IsCreated) return default;
+
+            Shape shape = AttachedBody.CreateMeshShape(BuildDef(), rebuilt);
+            if (!shape.IsValid)
+            {
+                rebuilt.Destroy();
+                return default;
+            }
+            _preRebuildMesh = _mesh;
+            _mesh = rebuilt;
+            return shape;
+        }
+
+        internal override void ReleaseRebuiltGeometry()
+        {
+            if (_preRebuildMesh.IsCreated) _preRebuildMesh.Destroy();
+            _preRebuildMesh = default;
+        }
+
         internal override void ReleaseGeometry()
         {
             if (_mesh.IsCreated) _mesh.Destroy();

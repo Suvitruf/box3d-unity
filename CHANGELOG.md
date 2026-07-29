@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.8.0] — 2026-07-29
+
+### Added — water
+- **`Box3DWater`** — GPU particle water: a position-based fluid (density constraint + XSPH
+  viscosity + cohesion) simulated in compute shaders, colliding with the Box3D world every step.
+  Spheres, capsules, boxes and terrain height fields collide **exactly**; other complex shapes
+  contribute the top face of their bounding box while it is plate-like (floors, road decks) so
+  sprawling meshes never dam or crush the fluid. **Two-way coupling** pushes dynamic bodies back
+  (props float, bob and get carried) with submersion-scaled drag. Includes whitewater/foam
+  tracking and a per-particle buffer API for custom renderers.
+- **`Box3DWaterRenderer`** — screen-space liquid surface for URP: depth-aware blurred surface,
+  thickness-based absorption, refraction (opaque texture), reflection, foam and spray streaks,
+  soft shore blending. Needs a URP camera with Depth Texture.
+- **`Box3DWaterfall`** — emits a particle stream into a `Box3DWater` from an aimable lip:
+  waterfalls, taps, fountains. Recycles the water's oldest particles on a fixed budget.
+- **`Box3DWind` → water** — **Water Influence** lets a wind zone grip the water surface (and its
+  foam/spray), fading to nothing in the bulk.
+- **`Box3DWaterVolume`** — analytic buoyancy volume for pool-style game water: Archimedes buoyancy
+  at the center of submersion (floaters right themselves), depth-scaled drag, currents, fill
+  level, deterministic sine waves (`SampleSurfaceY`), entry slap, and `BodyEntered`/`BodyExited`
+  events for splashes.
+- **Samples**: *Physics Water* (particle water pool with a waterfall, wind and floating props) and
+  *Water Pool* (buoyancy volume test bed) — both registered in the Package Manager.
+
+### Added — shapes & tooling
+- **`Box3DTerrainShape`** — a height-field shape built straight from a Unity Terrain (like
+  TerrainCollider): heightmap downsampling via **Sample Stride**, painted terrain holes carved out
+  of collision via **Apply Holes**. Static bodies only.
+- **`Box3DDeformable`** — dents the rendered mesh where impacts land (radius, strength, max depth),
+  with optional healing over time and an opt-in collision rebuild from the dented vertices.
+- **Box3D Physics Simulation** Scene-view tool — run live physics on the selected bodies in edit
+  mode while the rest of the scene stays put: drag props with the mouse, settle them, keep or
+  cancel the poses.
+
+### Fixed
+- `Samples~`/`Documentation~` folders are no longer hidden from git by a global `*~` ignore
+  pattern (repo-level `!*~/` un-ignore).
+- GameObject menu: the Water Volume and Water entries no longer collide (duplicate method).
+
 ## [0.7.2] — 2026-07-28
 
 ### Added — opt-in double precision (large worlds)

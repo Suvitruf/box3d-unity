@@ -1,11 +1,11 @@
 # Component layer (experimental)
 
 > **Young but feature-complete (0.3.x).** A MonoBehaviour layer that lets you author physics in the
-> Inspector instead of writing C#, mirroring Unity's Rigidbody/Collider model: bodies, all five
-> shape types (sphere, box, capsule, hull, mesh), compound (child) shapes, auto-static colliders,
-> seven joint components, and full inspector/gizmo/handle editing. The API is still settling, so
-> expect some churn. The pointer-level API in the rest of these docs remains the full-featured
-> path. Lives in a separate `Box3D.Hybrid` assembly.
+> Inspector instead of writing C#, mirroring Unity's Rigidbody/Collider model: bodies, all six
+> shape types (sphere, box, capsule, hull, mesh, terrain), compound (child) shapes, auto-static
+> colliders, seven joint components, and full inspector/gizmo/handle editing. The API is still
+> settling, so expect some churn. The pointer-level API in the rest of these docs remains the
+> full-featured path. Lives in a separate `Box3D.Hybrid` assembly.
 
 If you know Unity's physics components, you already know these:
 
@@ -18,8 +18,13 @@ If you know Unity's physics components, you already know these:
 | `Box3DCapsuleShape` | `CapsuleCollider` | A capsule shape (radius, height, axis). |
 | `Box3DHullShape` | convex `MeshCollider` | Convex hull from a mesh's vertices; works on dynamic bodies. |
 | `Box3DMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
-| `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. |
+| `Box3DTerrainShape` | `TerrainCollider` | Height field straight from a Unity Terrain (painted holes included); **static bodies only**. |
+| `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. Can also grip a `Box3DWater` surface. |
 | `Box3DExplosion` | — | Radial impulse burst with radius + falloff. |
+| `Box3DWaterVolume` | — | Buoyancy volume: bodies float/sink by density, with drag and current. |
+| `Box3DWater` | — | GPU particle water: real fluid that pools, flows and carries bodies ([guide](water.md)). |
+| `Box3DWaterfall` | — | Emits a particle stream into a `Box3DWater` — waterfalls, taps, fountains. |
+| `Box3DDeformable` | — | Dents the rendered mesh where impacts land; optional healing and collision update. |
 | `Box3DRope` | — | Source 2-style cable: live editor preview, bake static or simulate in game. |
 
 ## Quick start
@@ -93,6 +98,11 @@ Restitution notes that match the engine, not the component:
 `transform.lossyScale` is baked into shape dimensions at creation (spheres use the largest axis, as
 Unity does).
 
+`Box3DTerrainShape` builds a height field from the Terrain on its GameObject (or an assigned one):
+**Sample Stride** downsamples the heightmap for cheaper collision, **Apply Holes** carves painted
+terrain holes out of it. Static bodies only, and the shape must sit at the terrain's position —
+automatic when the component lives on the Terrain GameObject.
+
 ### Collision layers
 
 Shapes honor the GameObject's **Layer** and Unity's **Layer Collision Matrix**
@@ -144,8 +154,33 @@ Scene-authorable force fields — select one to see its gizmos:
   full **Impulse Per Area** inside **Radius**, fading to zero over **Falloff** beyond it. Trigger
   with `Explode()` from code, the Inspector's **Explode** button, or **Explode On Enable** for
   spawned prefabs. Gizmos show both radii and the blast rays.
+- **`Box3DWaterVolume`** — a buoyancy volume (game water). Dynamic bodies inside get Archimedes buoyancy
+  at the center of their submerged region (tilted floaters right themselves), depth-scaled
+  linear/angular drag, and an optional **Current** flow. Bodies float or sink by their own shape
+  density vs the water's **Density** (1000 = water). **Fill** sets how much of the zone holds water
+  — raise `FillLevel` at runtime to fill a pool; settled floaters sleep, a moving surface wakes
+  them. The zone is world-axis-aligned (water is horizontal). Submersion is estimated per shape
+  AABB — exact for boxes, gameplay-close elsewhere. Optional, all Inspector-configurable:
+  deterministic sine **waves** (`SampleSurfaceY(x, z)` exposes the same surface to your visuals, so
+  a wave mesh can match what bodies feel; waves keep floaters awake), an **Entry Slap** that sheds a
+  fraction of vertical speed on first contact (belly-flop physics), and **`BodyEntered` /
+  `BodyExited` events** for splashes and SFX. This is rigid-body water: no free-surface fluid —
+  splashes are a render-side effect you hook to the events (see the Water sample scene). At
+  Fill = 1 wave crests clamp to the zone top — water never exceeds the volume.
+- **`Box3DWater`** / **`Box3DWaterfall`** — the real fluid: GPU particle water that fills a volume,
+  pours from waterfalls, flows around Box3D shapes and carries floating bodies, rendered as a
+  screen-space liquid surface (URP). `Box3DWind` grips its surface via **Water Influence**. Full
+  guide: [water](water.md); see the **Physics Water** sample.
 
-Both live under **Add Component → Box3D → Forces** and **GameObject → Box3D**.
+All live under **Add Component → Box3D → Forces**; Wind and Explosion also in **GameObject → Box3D**.
+
+## Deformable
+
+`Box3DDeformable` dents this GameObject's rendered mesh where physics impacts land — deepest at the
+impact point, fading over **Radius**, scaled by impact speed and capped by **Max Depth**.
+**Recovery Speed** heals dents back over time; **Update Collision** rebuilds the hull/mesh shape
+from the dented vertices (off by default — deformation is visual-only and leaves determinism
+untouched). Works on static bodies too, so walls and floors can dent.
 
 ## Rope
 
@@ -183,6 +218,11 @@ Drop-in components for diagnostics — all optional, none needed to simulate:
 
 See [debug draw](debug-draw.md) for the overlay and HUD, and
 [determinism & replay](determinism-and-replay.md) for the recorder/replayer.
+
+There is also a Scene-view **Box3D Physics Simulation** tool (in the editor toolbar): select bodies
+and run live physics on just them while the rest of the scene stays put — drag props around with
+the mouse, let them settle, then keep or cancel the resulting poses. Handy for dressing levels
+with naturally resting objects.
 
 ## Current limits
 

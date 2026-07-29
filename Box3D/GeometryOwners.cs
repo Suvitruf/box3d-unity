@@ -112,19 +112,30 @@ namespace Box3D
 
         public bool IsCreated => Data != IntPtr.Zero;
 
-        /// <summary>Builds a height field from row-major grid heights (countX × countZ values).
+        /// <summary>Per-quad material index that removes a quad's collision (a hole).</summary>
+        public const byte HoleMaterial = 0xFF;
+
+        /// <summary>Builds a height field from row-major grid heights (countX × countZ values,
+        /// index = z * countX + x; +X spans columns, +Z spans rows from the field's corner origin).
         /// Min/max heights define the quantization range; use the same values on adjacent fields
-        /// that must line up.</summary>
+        /// that must line up. Optional per-quad material indices ((countX-1) × (countZ-1) values,
+        /// same ordering) flow into hit events; <see cref="HoleMaterial"/> (0xFF) removes a quad's
+        /// collision — terrain holes.</summary>
         public static unsafe HeightField Create(ReadOnlySpan<float> heights, int countX, int countZ,
-            float3 scale, float globalMinimumHeight, float globalMaximumHeight, bool clockwiseWinding = false)
+            float3 scale, float globalMinimumHeight, float globalMaximumHeight, bool clockwiseWinding = false,
+            ReadOnlySpan<byte> materialIndices = default)
         {
             if (countX < 2 || countZ < 2 || heights.Length != countX * countZ)
                 throw new ArgumentException("heights must contain exactly countX*countZ values (each count >= 2)", nameof(heights));
+            if (materialIndices.Length != 0 && materialIndices.Length != (countX - 1) * (countZ - 1))
+                throw new ArgumentException("materialIndices must be empty or contain exactly (countX-1)*(countZ-1) values", nameof(materialIndices));
             fixed (float* h = heights)
+            fixed (byte* m = materialIndices)
             {
                 var def = new b3HeightFieldDef
                 {
                     heights = h,
+                    materialIndices = m,
                     scale = scale,
                     countX = countX,
                     countZ = countZ,

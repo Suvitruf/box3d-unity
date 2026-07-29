@@ -1,0 +1,480 @@
+// Box3D Water — position-based fluid solver.
+//
+// Particles are solved as an incompressible fluid (density constraint + viscosity smoothing)
+// against analytic colliders extracted from the Box3D world each step (spheres, capsules,
+// oriented boxes and terrain height fields). Push-out corrections are accumulated per dynamic
+// body as fixed-point impulses
+// and read back on the CPU, which applies them through the Box3D force API — that reaction is
+// what makes bodies float, drift and get shoved by waves.
+//
+// Buffer conventions:
+//   _Positions[i].xyz  world position, .w  1 = alive, 0 = dead slot
+//   _Velocities[i].xyz velocity, .w  foam amount in [0, 1] (whitewater accumulator)
+//   _Predicted[i]      candidate position being relaxed by the constraint iterations
+//   _Scratch           per-stage float4 scratch (position deltas, then raw velocities)
+//   _Densities[i]      local density / rest density from the last constraint solve
+
+#pragma kernel ClearGrid
+#pragma kernel Predict
+#pragma kernel BuildGrid
+#pragma kernel SolveLambda
+#pragma kernel SolveDelta
+#pragma kernel ApplyDelta
+#pragma kernel UpdateVelocity
+#pragma kernel Finalize
+
+#define THREADS 128
+#define HASH_SIZE 131072      // 1 << 17 cells, must match Box3DWater.cs
+#define HASH_MASK (HASH_SIZE - 1)
+#define EMPTY 0xffffffff
+#define MAX_BODIES 128
+#define IMPULSE_SCALE 256.0   // fixed-point scale for the readback accumulators
+
+RWStructuredBuffer<float4> _Positions;
+RWStructuredBuffer<float4> _Velocities;
+RWStructuredBuffer<float4> _Predicted;
+RWStructuredBuffer<float4> _Scratch;
+RWStructuredBuffer<float>  _Lambdas;
+RWStructuredBuffer<float>  _Densities;
+RWStructuredBuffer<uint>   _GridHead;
+RWStructuredBuffer<uint>   _GridNext;
+RWStructuredBuffer<int>    _BodyImpulses; // per body: jx jy jz tx ty tz contacts pad (8 ints)
+
+// Collider primitives mirrored from the Box3D world (see Box3DWater.GatherColliders).
+struct WaterCollider
+{
+    float4 rot;      // world rotation quaternion of the owning body
+    float4 pos;      // xyz: world center (sphere/box), segment start (capsule) or grid corner (terrain)
+    float4 data;     // sphere: x=radius | capsule: xyz=segment end, w=radius
+                     // box: xyz=half extents, w=1 marks a world-AABB approximation (top face only)
+                     // terrain: xz=cell size, y=height scale, w=grid rows (countZ)
+    float4 velLin;   // body linear velocity (xyz)
+    float4 velAng;   // body angular velocity (xyz)
+    float4 bodyPos;  // body origin, for torque arms
+    int type;        // 0 sphere, 1 capsule, 2 box, 3 terrain height field
+    int bodyIndex;   // slot in _BodyImpulses, -1 for static/kinematic
+    int aux0;        // terrain: first sample in _TerrainHeights
+    int aux1;        // terrain: samples per row (countX)
+};
+StructuredBuffer<WaterCollider> _Colliders;
+
+// Normalized [0, 1] height grids of every terrain collider, packed back to back (row-major,
+// z * countX + x from the field corner); aux0/aux1 above index into it.
+StructuredBuffer<float> _TerrainHeights;
+
+cbuffer Params
+{
+    uint   _ParticleCount;    // highest used slot + 1
+    uint   _ColliderCount;
+    float  _DeltaTime;
+    float  _InvDeltaTime;
+    float3 _Gravity;
+    float  _ParticleRadius;   // r: collision radius
+    float  _SmoothingRadius;  // h = 4r
+    float  _RestDensity;
+    float  _ParticleMass;
+    float  _Poly6;            // 315 / (64 pi h^9)
+    float  _SpikyGrad;        // -45 / (pi h^6)
+    float  _CohesionK;        // artificial-pressure strength (surface tension feel)
+    float  _InvWDeltaQ;       // 1 / W_poly6(0.3 h)
+    float  _Viscosity;        // XSPH coefficient
+    float  _Damping;          // per-step velocity retain factor
+    float3 _BoundsMin;
+    float3 _BoundsMax;
+    uint   _Contain;          // 1 = solid walls at bounds, 0 = open (kill below floor)
+    float  _CouplingScale;    // scales impulses handed back to rigid bodies
+    float  _MaxSpeed;         // CFL clamp
+    float  _FoamDecay;        // per-substep foam retain factor
+    uint   _WindCount;        // active wind volumes, 4 float4s each (see _WindData)
+    float4 _WindData[32];     // per wind: [0] center.xyz, [1] rotation quat, [2] half extents.xyz, [3] acceleration.xyz
+}
+
+// ---------------------------------------------------------------- kernels & helpers
+
+float3 RotateByQuat(float4 q, float3 v)
+{
+    return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
+}
+
+float3 RotateByQuatInv(float4 q, float3 v)
+{
+    return v + 2.0 * cross(-q.xyz, cross(-q.xyz, v) + q.w * v);
+}
+
+int3 CellOf(float3 p)
+{
+    return (int3)floor(p / _SmoothingRadius);
+}
+
+uint HashCell(int3 c)
+{
+    uint h = (uint)(c.x * 73856093) ^ (uint)(c.y * 19349663) ^ (uint)(c.z * 83492791);
+    return h & HASH_MASK;
+}
+
+float WPoly6(float r2, float h2)
+{
+    float d = h2 - r2;
+    return d > 0.0 ? _Poly6 * d * d * d : 0.0;
+}
+
+[numthreads(THREADS, 1, 1)]
+void ClearGrid(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x < HASH_SIZE) _GridHead[id.x] = EMPTY;
+}
+
+[numthreads(THREADS, 1, 1)]
+void Predict(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+
+    float4 pos = _Positions[i];
+    if (pos.w < 0.5) { _Predicted[i] = pos; return; }
+
+    float3 v = _Velocities[i].xyz;
+    v += _Gravity * _DeltaTime;
+
+    // Wind volumes (Box3DWind): an acceleration inside each oriented box. Wind grips the
+    // surface, not the bulk — full effect on under-dense particles (surface, spray) and on
+    // foam, fading to nothing in the incompressible interior. A per-particle hash ripple
+    // breaks the response so the surface doesn't slide as one sheet (XSPH smooths it back
+    // into gusty patches).
+    if (_WindCount > 0)
+    {
+        float grip = saturate(saturate((1.0 - _Densities[i]) * 2.5) + _Velocities[i].w);
+        float ripple = 0.7 + 0.6 * frac(sin(dot(pos.xz, float2(12.9898, 78.233))) * 43758.5453);
+        float windScale = grip * ripple * _DeltaTime;
+        for (uint w = 0; w < _WindCount; w++)
+        {
+            uint b = w * 4u;
+            float3 local = RotateByQuatInv(_WindData[b + 1], pos.xyz - _WindData[b].xyz);
+            if (any(abs(local) > _WindData[b + 2].xyz)) continue;
+            v += _WindData[b + 3].xyz * windScale;
+        }
+    }
+
+    v *= _Damping;
+    float speed = length(v);
+    if (speed > _MaxSpeed) v *= _MaxSpeed / speed;
+
+    _Velocities[i].xyz = v;
+    _Predicted[i] = float4(pos.xyz + v * _DeltaTime, 1.0);
+}
+
+[numthreads(THREADS, 1, 1)]
+void BuildGrid(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+    if (_Predicted[i].w < 0.5) return;
+
+    uint hash = HashCell(CellOf(_Predicted[i].xyz));
+    uint prev;
+    InterlockedExchange(_GridHead[hash], i, prev);
+    _GridNext[i] = prev;
+}
+
+// Walks the 27 cells around p, invoking BODY(j) for each alive neighbor index j (including i).
+#define FOREACH_NEIGHBOR(p, BODY)                                        \
+    {                                                                    \
+        int3 _base = CellOf(p);                                          \
+        for (int _cz = -1; _cz <= 1; _cz++)                              \
+        for (int _cy = -1; _cy <= 1; _cy++)                              \
+        for (int _cx = -1; _cx <= 1; _cx++)                              \
+        {                                                                \
+            uint _j = _GridHead[HashCell(_base + int3(_cx, _cy, _cz))];  \
+            [loop] while (_j != EMPTY)                                   \
+            {                                                            \
+                { BODY }                                                 \
+                _j = _GridNext[_j];                                      \
+            }                                                            \
+        }                                                                \
+    }
+
+[numthreads(THREADS, 1, 1)]
+void SolveLambda(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+    float4 pi = _Predicted[i];
+    if (pi.w < 0.5) { _Lambdas[i] = 0.0; return; }
+
+    float h2 = _SmoothingRadius * _SmoothingRadius;
+    float massOverRest = _ParticleMass / _RestDensity;
+
+    float density = 0.0;
+    float3 gradI = 0.0;
+    float sumGrad2 = 0.0;
+
+    FOREACH_NEIGHBOR(pi.xyz,
+    {
+        float3 d = pi.xyz - _Predicted[_j].xyz;
+        float r2 = dot(d, d);
+        if (r2 < h2)
+        {
+            density += _ParticleMass * WPoly6(r2, h2);
+            float r = sqrt(r2);
+            if (r > 1e-6 && _j != i)
+            {
+                float coeff = _SpikyGrad * (_SmoothingRadius - r) * (_SmoothingRadius - r);
+                float3 g = (coeff * massOverRest / r) * d; // ∇W_spiky scaled by m/ρ0
+                gradI += g;
+                sumGrad2 += dot(g, g);
+            }
+        }
+    })
+
+    // Only compression is corrected; tensile pull comes from the cohesion term instead.
+    float normalized = density / _RestDensity;
+    _Densities[i] = normalized; // aeration signal for foam (low = surface / spray / impact)
+    float c = max(normalized - 1.0, 0.0);
+    sumGrad2 += dot(gradI, gradI);
+    _Lambdas[i] = -c / (sumGrad2 + 1.0e-1);
+}
+
+[numthreads(THREADS, 1, 1)]
+void SolveDelta(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+    float4 pi = _Predicted[i];
+    if (pi.w < 0.5) { _Scratch[i] = 0.0; return; }
+
+    float h2 = _SmoothingRadius * _SmoothingRadius;
+    float massOverRest = _ParticleMass / _RestDensity;
+    float lambdaI = _Lambdas[i];
+
+    float3 delta = 0.0;
+    FOREACH_NEIGHBOR(pi.xyz,
+    {
+        if (_j != i)
+        {
+            float3 d = pi.xyz - _Predicted[_j].xyz;
+            float r2 = dot(d, d);
+            if (r2 < h2)
+            {
+                float r = max(sqrt(r2), 1e-6);
+                float scorr = -_CohesionK * pow(WPoly6(r2, h2) * _InvWDeltaQ, 4.0);
+                float coeff = _SpikyGrad * (_SmoothingRadius - r) * (_SmoothingRadius - r);
+                delta += (lambdaI + _Lambdas[_j] + scorr) * (coeff * massOverRest / r) * d;
+            }
+        }
+    })
+
+    _Scratch[i] = float4(delta, 0.0);
+}
+
+void AccumulateImpulse(int bodyIndex, float3 impulse, float3 contact, float3 bodyOrigin)
+{
+    if (bodyIndex < 0 || bodyIndex >= MAX_BODIES) return;
+    float3 torque = cross(contact - bodyOrigin, impulse);
+    int base = bodyIndex * 8;
+    InterlockedAdd(_BodyImpulses[base + 0], (int)(impulse.x * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 1], (int)(impulse.y * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 2], (int)(impulse.z * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 3], (int)(torque.x * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 4], (int)(torque.y * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 5], (int)(torque.z * IMPULSE_SCALE));
+    InterlockedAdd(_BodyImpulses[base + 6], 1);
+}
+
+// Pushes p out of every collider it penetrates. Returns the corrected position and hands the
+// equal-and-opposite impulse of each push to the collider's body.
+float3 ResolveColliders(float3 p)
+{
+    float pr = _ParticleRadius;
+
+    for (uint c = 0; c < _ColliderCount; c++)
+    {
+        WaterCollider col = _Colliders[c];
+        float3 push = 0.0;
+
+        if (col.type == 0) // sphere
+        {
+            float3 d = p - col.pos.xyz;
+            float dist = length(d);
+            float pen = col.data.x + pr - dist;
+            if (pen > 0.0)
+            {
+                float3 n = dist > 1e-6 ? d / dist : float3(0, 1, 0);
+                push = n * pen;
+            }
+        }
+        else if (col.type == 1) // capsule
+        {
+            float3 a = col.pos.xyz;
+            float3 ab = col.data.xyz - a;
+            float t = saturate(dot(p - a, ab) / max(dot(ab, ab), 1e-8));
+            float3 q = a + ab * t;
+            float3 d = p - q;
+            float dist = length(d);
+            float pen = col.data.w + pr - dist;
+            if (pen > 0.0)
+            {
+                float3 n = dist > 1e-6 ? d / dist : float3(0, 1, 0);
+                push = n * pen;
+            }
+        }
+        else if (col.type == 2) // oriented box
+        {
+            float3 lp = RotateByQuatInv(col.rot, p - col.pos.xyz);
+            float3 he = col.data.xyz + pr;
+            if (col.data.w > 0.5)
+            {
+                // A world-AABB approximation of a complex shape (data.w = 1). Such a box is
+                // usually far bigger than the real geometry — a road spline's box swallows half
+                // the village — so of its faces only the top acts: a thin catcher shell that
+                // water can land on (the CFL clamp caps a substep move at one smoothing radius,
+                // so falling water cannot jump it). Sides and bottom stay open — they would dam
+                // water at invisible walls, or crush it against exact geometry (the terrain)
+                // running through the box, which pumps the pond dry via the density solver.
+                float below = he.y - lp.y; // depth below the inflated top plane
+                if (below >= 0.0 && below <= _SmoothingRadius && all(abs(lp.xz) < he.xz))
+                {
+                    push = float3(0.0, below, 0.0); // world AABBs carry identity rotation
+                }
+            }
+            else // a real box hull: solid — push out through the nearest face
+            {
+                float3 q = abs(lp) - he;
+                float sd = min(max(q.x, max(q.y, q.z)), 0.0); // < 0 only when inside
+                if (sd < 0.0)
+                {
+                    float3 dist = he - abs(lp);
+                    float3 ln = dist.x < dist.y && dist.x < dist.z ? float3(sign(lp.x), 0, 0)
+                       : dist.y < dist.z ? float3(0, sign(lp.y), 0)
+                       : float3(0, 0, sign(lp.z));
+                    push = RotateByQuat(col.rot, ln * -sd);
+                }
+            }
+        }
+        else // terrain height field: bilinear height surface, open past the grid's edges
+        {
+            float3 local = p - col.pos.xyz;
+            float2 f = local.xz / float2(col.data.x, col.data.z);
+            float2 hi = float2(col.aux1 - 1, (int)col.data.w - 1);
+            if (all(f >= 0.0) && all(f <= hi))
+            {
+                int2 cell = min((int2)f, (int2)(hi - 1.0));
+                float2 t = f - (float2)cell;
+                int first = col.aux0 + cell.y * col.aux1 + cell.x;
+                float h00 = _TerrainHeights[first];
+                float h10 = _TerrainHeights[first + 1];
+                float h01 = _TerrainHeights[first + col.aux1];
+                float h11 = _TerrainHeights[first + col.aux1 + 1];
+
+                float height = lerp(lerp(h00, h10, t.x), lerp(h01, h11, t.x), t.y) * col.data.y;
+                // Normal from the patch gradient, so water slides down slopes instead of
+                // stacking on them; penetration is the vertical gap projected onto it.
+                float3 n = normalize(float3(
+                    (lerp(h00, h01, t.y) - lerp(h10, h11, t.y)) * col.data.y / col.data.x,
+                    1.0,
+                    (lerp(h00, h10, t.x) - lerp(h01, h11, t.x)) * col.data.y / col.data.z));
+                float pen = pr - (local.y - height) * n.y;
+                if (pen > 0.0) push = n * pen;
+            }
+        }
+
+        if (any(push != 0.0))
+        {
+            p += push;
+            if (col.bodyIndex >= 0)
+            {
+                float3 impulse = -push * (_ParticleMass * _InvDeltaTime) * _CouplingScale;
+                AccumulateImpulse(col.bodyIndex, impulse, p, col.bodyPos.xyz);
+            }
+        }
+    }
+
+    return p;
+}
+
+[numthreads(THREADS, 1, 1)]
+void ApplyDelta(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+    float4 pi = _Predicted[i];
+    if (pi.w < 0.5) return;
+
+    float3 p = pi.xyz + _Scratch[i].xyz;
+    p = ResolveColliders(p);
+
+    if (_Contain == 1)
+    {
+        p = clamp(p, _BoundsMin + _ParticleRadius, _BoundsMax - _ParticleRadius);
+    }
+    else if (p.y < _BoundsMin.y - 4.0 * _SmoothingRadius)
+    {
+        _Predicted[i] = float4(p, 0.0); // fell out of the world: retire the slot
+        return;
+    }
+
+    _Predicted[i] = float4(p, 1.0);
+}
+
+[numthreads(THREADS, 1, 1)]
+void UpdateVelocity(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+
+    // Constraint corrections become velocity here, so the CFL clamp must apply here too —
+    // otherwise a sudden rest-state mismatch (parameter change, fast collider sweep) converts
+    // into near-unbounded speeds and the fluid detonates.
+    float3 v = (_Predicted[i].xyz - _Positions[i].xyz) * _InvDeltaTime;
+    float speed = length(v);
+    if (speed > _MaxSpeed) v *= _MaxSpeed / speed;
+    _Scratch[i] = float4(v, 0.0);
+}
+
+[numthreads(THREADS, 1, 1)]
+void Finalize(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    if (i >= _ParticleCount) return;
+    float4 pi = _Predicted[i];
+    if (_Positions[i].w < 0.5) return; // stayed dead
+    if (pi.w < 0.5)                    // died this step (fell out of open bounds)
+    {
+        _Positions[i] = float4(pi.xyz, 0.0);
+        _Velocities[i] = 0.0;
+        return;
+    }
+
+    // XSPH viscosity: pull the velocity toward the neighborhood average for that thick,
+    // coherent water feel. Raw velocities were staged into _Scratch by UpdateVelocity.
+    float h2 = _SmoothingRadius * _SmoothingRadius;
+    float massOverRest = _ParticleMass / _RestDensity;
+    float3 vi = _Scratch[i].xyz;
+    float3 dv = 0.0;
+
+    if (_Viscosity > 0.0)
+    {
+        FOREACH_NEIGHBOR(pi.xyz,
+        {
+            if (_j != i)
+            {
+                float3 d = pi.xyz - _Predicted[_j].xyz;
+                float r2 = dot(d, d);
+                if (r2 < h2)
+                {
+                    dv += (_Scratch[_j].xyz - vi) * (WPoly6(r2, h2) * massOverRest);
+                }
+            }
+        })
+    }
+
+    float3 v = vi + _Viscosity * dv;
+
+    // Whitewater: aerated (under-dense) particles moving fast churn into foam, which then
+    // decays back to clear water. Lives in velocity.w so renderers get it for free.
+    float aeration = saturate((1.0 - _Densities[i]) * 2.5);
+    float churn = aeration * smoothstep(1.5, 4.0, length(v));
+    float foam = max(_Velocities[i].w * _FoamDecay, churn);
+
+    _Velocities[i] = float4(v, foam);
+    _Positions[i] = float4(pi.xyz, 1.0);
+}

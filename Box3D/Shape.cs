@@ -29,6 +29,11 @@ namespace Box3D
             set => UnsafeBindings.b3Shape_SetUserData(Id, (void*)value);
         }
 
+        /// <summary>The body-local bounding box of a hull shape's vertices. Only valid for
+        /// <see cref="ShapeType.Hull"/> shapes; box hulls are exactly this box. Useful for building
+        /// an oriented-box approximation of the hull in world space (bounds × body transform).</summary>
+        public unsafe B3Aabb GetHullLocalBounds() => UnsafeBindings.b3Shape_GetHull(Id)->Aabb;
+
         /// <summary>Replaces the sphere geometry of a sphere shape.</summary>
         public unsafe void SetSphere(in Sphere sphere)
         {

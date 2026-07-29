@@ -50,6 +50,26 @@ namespace Box3D.Hybrid
             return shape;
         }
 
+        // Convex recompute from the dented vertices. Hulls bridge over craters, so this only
+        // changes collision where the deformation flattens corners or edges.
+        internal override Shape CreateRebuiltShape(Vector3[] vertices, int[] triangles)
+        {
+            if (vertices.Length < 4) return default;
+
+            var points = new float3[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                points[i] = AttachedPosition + math.mul(AttachedRotation, ((float3)vertices[i] + LocalCenter) * AttachedScale);
+            }
+
+            Hull hull = Hull.Create(points, MaxVertices);
+            if (!hull.IsCreated) return default; // degenerate point cloud — keep the old hull
+
+            Shape shape = AttachedBody.CreateHullShape(BuildDef(), hull);
+            hull.Destroy();
+            return shape;
+        }
+
         private void OnDrawGizmosSelected()
         {
             // Approximate: draws the source mesh, not the exact convex hull (close enough to place).
