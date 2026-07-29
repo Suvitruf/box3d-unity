@@ -7,6 +7,7 @@
 #                probed from Unity Hub installs if unset
 #   ANDROID_ABI  target ABI, default arm64-v8a (also: armeabi-v7a, x86_64)
 #   BOX3D_SRC    box3d checkout; auto-probed next to the repo if unset
+#   BOX3D_DOUBLE set (any value) to build the DOUBLE-precision variant → libbox3d_d.so
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -31,13 +32,19 @@ fi
     echo "error: Android NDK not found — set ANDROID_NDK" >&2; exit 1; }
 
 ABI="${ANDROID_ABI:-arm64-v8a}"
-BUILD="build-android-$ABI"
+PREC=""; SUFFIX=""; DVARIANT=""
+if [ -n "${BOX3D_DOUBLE:-}" ]; then
+    PREC=-DBOX3D_DOUBLE_PRECISION=ON; SUFFIX=_d; DVARIANT=-double
+fi
+BUILD="build-android-$ABI$DVARIANT"
 OUT="../Plugins/Android/$ABI"
 
-GENERATOR_ARGS=()
-command -v ninja >/dev/null && GENERATOR_ARGS=(-G Ninja)
+# Plain string, not an array: macOS hosts run bash 3.2, where expanding an empty
+# array under `set -u` is an "unbound variable" error.
+GENERATOR_ARGS=""
+command -v ninja >/dev/null && GENERATOR_ARGS="-G Ninja"
 
-cmake -S "$BOX3D_SRC" -B "$BUILD" "${GENERATOR_ARGS[@]}" \
+cmake -S "$BOX3D_SRC" -B "$BUILD" $GENERATOR_ARGS \
   -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM=android-23 \
@@ -46,14 +53,15 @@ cmake -S "$BOX3D_SRC" -B "$BUILD" "${GENERATOR_ARGS[@]}" \
   -DBUILD_SHARED_LIBS=ON \
   -DBOX3D_SAMPLES=OFF \
   -DBOX3D_UNIT_TESTS=OFF \
-  -DBOX3D_BENCHMARKS=OFF
+  -DBOX3D_BENCHMARKS=OFF \
+  $PREC
 
 cmake --build "$BUILD" -j
 
 mkdir -p "$OUT"
-cp "$BUILD"/bin/libbox3d.so "$OUT"/libbox3d.so 2>/dev/null || cp "$BUILD"/src/libbox3d.so "$OUT"/libbox3d.so
+cp "$BUILD"/bin/libbox3d.so "$OUT/libbox3d$SUFFIX.so" 2>/dev/null || cp "$BUILD"/src/libbox3d.so "$OUT/libbox3d$SUFFIX.so"
 
 STRIP=$(ls "$NDK"/toolchains/llvm/prebuilt/*/bin/llvm-strip 2>/dev/null | head -1)
-[ -n "$STRIP" ] && "$STRIP" --strip-unneeded "$OUT"/libbox3d.so
+[ -n "$STRIP" ] && "$STRIP" --strip-unneeded "$OUT/libbox3d$SUFFIX.so"
 
-echo "Done: $OUT/libbox3d.so"
+echo "Done: $OUT/libbox3d$SUFFIX.so"

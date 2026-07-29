@@ -8,7 +8,7 @@ namespace Box3D
     public partial struct World
     {
         public B3Aabb GetBounds() => UnsafeBindings.b3World_GetBounds(Id);
-        public RayResult CastRayClosest(Unity.Mathematics.float3 origin, Unity.Mathematics.float3 translation, QueryFilter filter) => UnsafeBindings.b3World_CastRayClosest(Id, origin, translation, filter);
+        public RayResult CastRayClosest(B3Pos origin, Unity.Mathematics.float3 translation, QueryFilter filter) => UnsafeBindings.b3World_CastRayClosest(Id, origin, translation, filter);
         public void EnableSleeping(bool flag) => UnsafeBindings.b3World_EnableSleeping(Id, flag);
         public bool IsSleepingEnabled() => UnsafeBindings.b3World_IsSleepingEnabled(Id);
         public void EnableContinuous(bool flag) => UnsafeBindings.b3World_EnableContinuous(Id, flag);

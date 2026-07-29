@@ -41,11 +41,23 @@ namespace Box3D
                 return;
             }
 
+            // Two-way precision guard: the BOX3D_DOUBLE scripting define bakes the managed struct
+            // layouts AND selects the native library name — a mismatch silently corrupts memory.
+#if BOX3D_DOUBLE
+            if (!Box3DApi.IsDoublePrecision)
+            {
+                Debug.LogError("[Box3D] BOX3D_DOUBLE is defined but the loaded native library is " +
+                               "single precision — struct layouts will not match. Ship the double " +
+                               "build (box3d_d) or remove the define.");
+            }
+#else
             if (Box3DApi.IsDoublePrecision)
             {
-                Debug.LogError("[Box3D] Native library was built with BOX3D_DOUBLE_PRECISION — " +
-                               "this wrapper requires a single-precision build. Struct layouts will not match.");
+                Debug.LogError("[Box3D] Native library was built with BOX3D_DOUBLE_PRECISION but " +
+                               "BOX3D_DOUBLE is not defined — struct layouts will not match. Define " +
+                               "BOX3D_DOUBLE or use a single-precision build.");
             }
+#endif
 
             UnsafeBindings.b3SetLogFcn(Marshal.GetFunctionPointerForDelegate(LogHandler));
             UnsafeBindings.b3SetAssertFcn(Marshal.GetFunctionPointerForDelegate(AssertHandler));

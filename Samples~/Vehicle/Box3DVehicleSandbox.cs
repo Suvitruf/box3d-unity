@@ -168,11 +168,11 @@ public class Box3DVehicleSandbox : MonoBehaviour
 
         _world.Step(Time.fixedDeltaTime);
 
-        B3Transform chassisTransform = _chassis.Transform;
+        B3Transform chassisTransform = _chassis.Transform.ToB3Transform();
         _chassisVisual.SetPositionAndRotation(chassisTransform.Position, chassisTransform.Rotation);
         for (int i = 0; i < 4; i++)
         {
-            B3Transform wheelTransform = _wheels[i].Transform;
+            B3Transform wheelTransform = _wheels[i].Transform.ToB3Transform();
             _wheelVisuals[i].SetPositionAndRotation(wheelTransform.Position, wheelTransform.Rotation);
         }
     }
@@ -180,7 +180,7 @@ public class Box3DVehicleSandbox : MonoBehaviour
     private void LateUpdate()
     {
         if (!_camera) return;
-        float3 chassisPosition = _chassis.Position;
+        float3 chassisPosition = (float3)_chassis.Position;
         float3 forward = math.mul(_chassis.Rotation, new float3(1f, 0f, 0f));
         Vector3 target = (Vector3)(chassisPosition - forward * 8f + new float3(0f, 4f, 0f));
         _camera.transform.position = Vector3.Lerp(_camera.transform.position, target, 5f * Time.deltaTime);

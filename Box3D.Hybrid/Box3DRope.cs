@@ -242,7 +242,7 @@ namespace Box3D.Hybrid
                 // Node in the attached body's frame (bodies have no scale — pose math, not
                 // Transform.InverseTransformPoint, which would bake lossyScale in).
                 other = attach.Body;
-                otherLocal = math.mul(math.inverse(other.Rotation), worldNode - other.Position);
+                otherLocal = math.mul(math.inverse(other.Rotation), worldNode - (float3)other.Position);
             }
             else
             {
@@ -272,7 +272,7 @@ namespace Box3D.Hybrid
 
         private static Vector3 SegmentTip(Body body, float alongZ)
         {
-            return (Vector3)(body.Position + math.mul(body.Rotation, new float3(0f, 0f, alongZ)));
+            return (Vector3)((float3)body.Position + math.mul(body.Rotation, new float3(0f, 0f, alongZ)));
         }
 
         private void OnDestroy()

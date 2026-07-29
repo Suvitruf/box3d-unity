@@ -176,7 +176,7 @@ public class PyramidBenchmark : MonoBehaviour
 
         foreach ((Body body, Transform visual) in _spheres)
         {
-            B3Transform t = body.Transform;
+            B3Transform t = body.Transform.ToB3Transform();
             visual.SetPositionAndRotation(t.Position, t.Rotation);
         }
 

@@ -166,6 +166,7 @@ ones require the Input System package.
 - [Determinism & replay](Documentation~/determinism-and-replay.md) — record, validate, and scrub replays
 - [Determinism testing](Documentation~/determinism-testing.md) — state hashing for lockstep/cross-platform checks
 - [Performance](Documentation~/performance.md)
+- [Double precision (large worlds)](Documentation~/double-precision.md) — opt-in `BOX3D_DOUBLE` mode
 - [Building the native libraries](Documentation~/building-natives.md)
 
 ## Support & community

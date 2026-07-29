@@ -4,7 +4,8 @@ The package ships prebuilt Box3D binaries in `Plugins/`; you only need this page
 platform, update the pinned Box3D version, or audit what you're running.
 
 All binaries are built from the **pinned Box3D commit** recorded in `Box3D.Native~/VERSION`,
-Release configuration, single precision, via the scripts in `Box3D.Native~/`. The C API surface
+Release configuration, single precision by default (see
+[the double-precision variant](#double-precision-variant)), via the scripts in `Box3D.Native~/`. The C API surface
 (~580 exported functions) must match the generated bindings — never mix binaries and bindings
 from different Box3D commits.
 
@@ -32,6 +33,24 @@ resolved automatically where possible and overridable via environment variables:
 Every script configures CMake with `BUILD_SHARED_LIBS=ON` (static for iOS), builds Release, and
 copies the result into `Plugins/`. If a script can't find something it exits with a message naming
 the variable to set.
+
+## Double-precision variant
+
+Every build script also produces the opt-in [double-precision](double-precision.md) library when
+the `BOX3D_DOUBLE` environment variable is set (any value): it adds `-DBOX3D_DOUBLE_PRECISION=ON`
+and, on dynamically linked platforms, names the output with a `_d` suffix so it ships **alongside**
+the single build (`box3d_d.dll`, `libbox3d_d.so`, `libbox3d_d.dylib`) — the `BOX3D_DOUBLE`
+scripting define then selects it by name at runtime. On the statically linked platforms (iOS,
+WebGL) the archive keeps its name and is staged under `Box3D.Native~/double-staging/` instead
+(outside Unity's asset scope, so it can never be imported and linked by accident) — it is not shipped by default; see the
+[iOS / WebGL section](double-precision.md#ios--webgl-static-linking) for how it gets used.
+
+```bash
+BOX3D_DOUBLE=1 bash build_linux.sh     # → Plugins/Linux/x86_64/libbox3d_d.so
+```
+
+The `build-natives` CI workflow has a matching `precision` input (`single` / `double` / `both`,
+default `both`) and builds the same outputs on every platform in one run.
 
 ## WebGL specifics
 

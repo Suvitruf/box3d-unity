@@ -127,7 +127,7 @@ public class Box3DBenchmark : MonoBehaviour
         foreach (BodyMoveEvent moveEvent in _world.GetBodyMoveEvents())
         {
             int index = (int)moveEvent.UserData;
-            _visuals[index].SetPositionAndRotation(moveEvent.Transform.Position, moveEvent.Transform.Rotation);
+            _visuals[index].SetPositionAndRotation((Vector3)moveEvent.Transform.Position, moveEvent.Transform.Rotation);
         }
     }
 

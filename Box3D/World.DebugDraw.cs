@@ -87,28 +87,28 @@ namespace Box3D
         private delegate void DestroyDebugShapeDelegate(void* userShape, void* userContext);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate NativeBool DrawShapeDelegate(void* userShape, B3Transform transform, uint color, void* context);
+        private delegate NativeBool DrawShapeDelegate(void* userShape, B3WorldTransform transform, uint color, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void SegmentDelegate(float3 p1, float3 p2, uint color, void* context);
+        private delegate void SegmentDelegate(B3Pos p1, B3Pos p2, uint color, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void TransformDelegate(B3Transform transform, void* context);
+        private delegate void TransformDelegate(B3WorldTransform transform, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void PointDelegate(float3 p, float size, uint color, void* context);
+        private delegate void PointDelegate(B3Pos p, float size, uint color, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void SphereDelegate(float3 p, float radius, uint color, float alpha, void* context);
+        private delegate void SphereDelegate(B3Pos p, float radius, uint color, float alpha, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void CapsuleDelegate(float3 p1, float3 p2, float radius, uint color, float alpha, void* context);
+        private delegate void CapsuleDelegate(B3Pos p1, B3Pos p2, float radius, uint color, float alpha, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void BoundsDelegate(B3Aabb aabb, uint color, void* context);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-        private delegate void BoxDelegate(float3 extents, B3Transform transform, uint color, void* context);
+        private delegate void BoxDelegate(float3 extents, B3WorldTransform transform, uint color, void* context);
 
         private static readonly CreateDebugShapeDelegate CreateShapeInstance = CreateDebugShape;
         private static readonly DestroyDebugShapeDelegate DestroyShapeInstance = DestroyDebugShape;
@@ -191,11 +191,12 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(DrawShapeDelegate))]
-        private static NativeBool DrawShape(void* userShape, B3Transform transform, uint color, void* context)
+        private static NativeBool DrawShape(void* userShape, B3WorldTransform worldTransform, uint color, void* context)
         {
             try
             {
                 DrawCallCount++;
+                B3Transform transform = worldTransform.ToB3Transform();
                 var lines = (float3[])GCHandle.FromIntPtr((IntPtr)userShape).Target;
                 Color unityColor = ToColor(color);
                 for (int i = 0; i < lines.Length; i += 2)
@@ -288,12 +289,12 @@ namespace Box3D
         // --- gizmo-level draw callbacks ---
 
         [MonoPInvokeCallback(typeof(SegmentDelegate))]
-        private static void DrawSegment(float3 p1, float3 p2, uint color, void* context)
+        private static void DrawSegment(B3Pos wp1, B3Pos wp2, uint color, void* context)
         {
             try
             {
                 DrawCallCount++;
-                Line(p1, p2, ToColor(color));
+                Line((float3)wp1, (float3)wp2, ToColor(color));
             }
             catch (Exception exception)
             {
@@ -302,11 +303,12 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(TransformDelegate))]
-        private static void DrawTransform(B3Transform transform, void* context)
+        private static void DrawTransform(B3WorldTransform worldTransform, void* context)
         {
             try
             {
                 DrawCallCount++;
+                B3Transform transform = worldTransform.ToB3Transform();
                 const float axisLength = 0.3f;
                 float3 p = transform.Position;
                 Line(p, p + math.mul(transform.Rotation, new float3(axisLength, 0f, 0f)), Color.red);
@@ -320,11 +322,12 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(PointDelegate))]
-        private static void DrawPoint(float3 p, float size, uint color, void* context)
+        private static void DrawPoint(B3Pos wp, float size, uint color, void* context)
         {
             try
             {
                 DrawCallCount++;
+                float3 p = (float3)wp;
                 Color unityColor = ToColor(color);
                 float h = size * 0.02f;
                 Line(p - new float3(h, 0f, 0f), p + new float3(h, 0f, 0f), unityColor);
@@ -338,11 +341,12 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(SphereDelegate))]
-        private static void DrawSphere(float3 p, float radius, uint color, float alpha, void* context)
+        private static void DrawSphere(B3Pos wp, float radius, uint color, float alpha, void* context)
         {
             try
             {
                 DrawCallCount++;
+                float3 p = (float3)wp;
                 Color unityColor = ToColor(color);
                 DrawCircleLines(p, radius, new float3(1f, 0f, 0f), new float3(0f, 1f, 0f), unityColor);
                 DrawCircleLines(p, radius, new float3(0f, 1f, 0f), new float3(0f, 0f, 1f), unityColor);
@@ -355,11 +359,13 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(CapsuleDelegate))]
-        private static void DrawCapsule(float3 p1, float3 p2, float radius, uint color, float alpha, void* context)
+        private static void DrawCapsule(B3Pos wp1, B3Pos wp2, float radius, uint color, float alpha, void* context)
         {
             try
             {
                 DrawCallCount++;
+                float3 p1 = (float3)wp1;
+                float3 p2 = (float3)wp2;
                 Color unityColor = ToColor(color);
                 float3 axis = math.normalizesafe(p2 - p1, new float3(0f, 1f, 0f));
                 float3 side = math.normalizesafe(math.cross(axis, new float3(0.371f, 0.827f, 0.421f)), new float3(1f, 0f, 0f));
@@ -393,11 +399,12 @@ namespace Box3D
         }
 
         [MonoPInvokeCallback(typeof(BoxDelegate))]
-        private static void DrawBox(float3 extents, B3Transform transform, uint color, void* context)
+        private static void DrawBox(float3 extents, B3WorldTransform worldTransform, uint color, void* context)
         {
             try
             {
                 DrawCallCount++;
+                B3Transform transform = worldTransform.ToB3Transform();
                 var corners = new float3[8];
                 for (int i = 0; i < 8; i++)
                 {

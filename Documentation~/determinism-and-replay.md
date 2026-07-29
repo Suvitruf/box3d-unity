@@ -17,6 +17,11 @@ not your rendered objects. That's expected: this is a physics-state viewer, not 
 Recordings are **snapshot-seeded** — the full world state is captured at `StartRecording`, so the
 replay stands up the same bodies even if you start recording after the world is populated.
 
+Recordings are also **precision-specific**: positions are serialized at the build's native width
+(float, or double under `BOX3D_DOUBLE`), so a `.rec` written by a single-precision build will not
+load in a double-precision build or vice versa — the replayer reports "not a valid replay".
+Re-record with the current build if you switch precision.
+
 ## Determinism check (record → validate)
 
 The headline: prove your simulation is reproducible.
