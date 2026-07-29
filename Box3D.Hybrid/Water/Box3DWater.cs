@@ -20,7 +20,7 @@ namespace Box3D.Hybrid
         [SerializeField, Range(0.04f, 0.5f), Tooltip("Particle radius in meters. Smaller particles = finer, more detailed water that costs more to simulate. Editing this in play mode re-seeds the water at the new size.")]
         private float ParticleRadius = 0.12f;
 
-        [SerializeField, Range(1024, 65536), Tooltip("Particle pool size. The volume fill and any splash emitters share this budget; oldest particles are recycled when it runs out.")]
+        [SerializeField, Range(1024, 131072), Tooltip("Particle pool size. The volume fill and any splash emitters share this budget; oldest particles are recycled when it runs out.")]
         private int MaxParticles = 16384;
 
         [SerializeField, Range(0f, 1f), Tooltip("How syrupy the water feels. 0 = lively and splashy, 1 = thick and slow.")]
