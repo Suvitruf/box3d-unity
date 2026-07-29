@@ -18,6 +18,7 @@ If you know Unity's physics components, you already know these:
 | `Box3DCapsuleShape` | `CapsuleCollider` | A capsule shape (radius, height, axis). |
 | `Box3DHullShape` | convex `MeshCollider` | Convex hull from a mesh's vertices; works on dynamic bodies. |
 | `Box3DMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
+| `Box3DTerrainShape` | `TerrainCollider` | Height field from a Unity Terrain, with painted-hole and downsampling support; **static bodies only**. |
 | `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. |
 | `Box3DExplosion` | — | Radial impulse burst with radius + falloff. |
 | `Box3DDeformable` | — | Dents the visual mesh where impacts land; optional healing. |
