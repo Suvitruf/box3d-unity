@@ -26,6 +26,11 @@
   ],
   "samples": [
     {
+      "displayName": "Water (buoyancy volume)",
+      "description": "A fillable swimming pool built on Box3DWaterVolume: waves, entry splashes, draggable floaters and sinkers of different densities.",
+      "path": "Samples~/Water"
+    },
+    {
       "displayName": "Components (experimental)",
       "description": "Author physics in the Inspector with the MonoBehaviour component layer (Box3DBody / Box3DShape). Buttons spawn objects onto a static floor.",
       "path": "Samples~/Components"

@@ -20,6 +20,7 @@ If you know Unity's physics components, you already know these:
 | `Box3DMeshShape` | non-convex `MeshCollider` | Triangle mesh from a mesh asset; **static bodies only**. |
 | `Box3DWind` | `WindZone` (visual-only in Unity) | Pushes dynamic bodies inside a box volume; optional gusts. |
 | `Box3DExplosion` | — | Radial impulse burst with radius + falloff. |
+| `Box3DWaterVolume` | — | Buoyancy volume: bodies float/sink by density, with drag and current. |
 | `Box3DRope` | — | Source 2-style cable: live editor preview, bake static or simulate in game. |
 
 ## Quick start
@@ -144,8 +145,21 @@ Scene-authorable force fields — select one to see its gizmos:
   full **Impulse Per Area** inside **Radius**, fading to zero over **Falloff** beyond it. Trigger
   with `Explode()` from code, the Inspector's **Explode** button, or **Explode On Enable** for
   spawned prefabs. Gizmos show both radii and the blast rays.
+- **`Box3DWaterVolume`** — a buoyancy volume (game water). Dynamic bodies inside get Archimedes buoyancy
+  at the center of their submerged region (tilted floaters right themselves), depth-scaled
+  linear/angular drag, and an optional **Current** flow. Bodies float or sink by their own shape
+  density vs the water's **Density** (1000 = water). **Fill** sets how much of the zone holds water
+  — raise `FillLevel` at runtime to fill a pool; settled floaters sleep, a moving surface wakes
+  them. The zone is world-axis-aligned (water is horizontal). Submersion is estimated per shape
+  AABB — exact for boxes, gameplay-close elsewhere. Optional, all Inspector-configurable:
+  deterministic sine **waves** (`SampleSurfaceY(x, z)` exposes the same surface to your visuals, so
+  a wave mesh can match what bodies feel; waves keep floaters awake), an **Entry Slap** that sheds a
+  fraction of vertical speed on first contact (belly-flop physics), and **`BodyEntered` /
+  `BodyExited` events** for splashes and SFX. This is rigid-body water: no free-surface fluid —
+  splashes are a render-side effect you hook to the events (see the Water sample scene). At
+  Fill = 1 wave crests clamp to the zone top — water never exceeds the volume.
 
-Both live under **Add Component → Box3D → Forces** and **GameObject → Box3D**.
+All live under **Add Component → Box3D → Forces**; Wind and Explosion also in **GameObject → Box3D**.
 
 ## Rope
 

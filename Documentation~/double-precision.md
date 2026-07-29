@@ -79,6 +79,8 @@ Behavioral differences in double mode:
   recording made in one precision won't replay in the other. Re-record after switching.
 - **Determinism hashes are precision-specific** — `Determinism.HashState` hashes the full-width
   position bits, so compare hashes only between builds of the same precision.
+- **`Box3DWaterVolume` samples its surface in float** — correct near the origin; for genuinely
+  far-from-origin water, position the volume (and your render origin) near the action.
 
 ## The render side (floating origin)
 

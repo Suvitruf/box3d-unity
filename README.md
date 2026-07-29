@@ -50,7 +50,8 @@ This project was inspired by, and owes its architecture to, two projects:
   across worker counts), save it, and scrub the replay frame by frame with divergence detection —
   either as wireframes or played back on your real scene objects. For lockstep/rollback netcode and
   bug repro. No other Unity physics wrapper ships this.
-- **Extras** — explosions, wind, conveyor surface materials.
+- **Extras** — explosions, wind, water buoyancy volumes (waves, splashing events), conveyor
+  surface materials.
 - **Multithreading** — box3d's internal scheduler, configurable worker count per world.
 - **Component layer (experimental)** — author bodies and shapes in the Inspector, mirroring
   Unity's Rigidbody/Collider model (see the docs).
