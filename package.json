@@ -1,6 +1,6 @@
 {
   "name": "com.suvitruf.box3d",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "displayName": "Box3D for Unity",
   "description": "Unity bindings for Box3D, Erin Catto's 3D physics engine. Full C API coverage via P/Invoke: rigid bodies, six shape types, nine joint types, queries, contact/sensor events, a character mover toolkit and debug drawing — with deterministic simulation and strong multithreaded performance.",
   "unity": "6000.0",
@@ -69,6 +69,16 @@
       "displayName": "Playground",
       "description": "Interactive sandbox: spawn textured objects from a menu, drag/throw with the mouse, right-click explosions, a seesaw, a conveyor belt, impact flashes and a live step-time readout. Requires the Input System package.",
       "path": "Samples~/Playground"
+    },
+    {
+      "displayName": "Water Pool (buoyancy volume)",
+      "description": "Box3DWaterVolume test bed: a fillable pool with draggable floaters and sinkers, wave surface, splash particles and an underwater tint. Requires the Input System package for dragging.",
+      "path": "Samples~/Water"
+    },
+    {
+      "displayName": "Physics Water",
+      "description": "GPU particle water (Box3DWater): a pool with floating crates, a beach ball and a sinking iron block, a waterfall and a wind zone, plus fill / drain / splash controls and mouse-drag throwing. Water surface rendering requires URP with Depth Texture (Opaque Texture for refraction).",
+      "path": "Samples~/PhysicsWater"
     }
   ]
 }

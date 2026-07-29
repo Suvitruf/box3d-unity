@@ -69,7 +69,7 @@ namespace Box3D.Hybrid.Editor
         }
 
         [MenuItem(Root + "Water Volume", false, 33)]
-        private static void CreateWater(MenuCommand command)
+        private static void CreateWaterVolume(MenuCommand command)
         {
             var go = new GameObject("Water Volume", typeof(Box3DWaterVolume));
             Place(go, command, "Create Box3D Water Volume");
@@ -85,6 +85,22 @@ namespace Box3D.Hybrid.Editor
             line.numCornerVertices = 4;
             line.sharedMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Line.mat");
             Place(go, command, "Create Box3D Rope");
+        }
+
+        [MenuItem(Root + "Water", false, 33)]
+        private static void CreateWater(MenuCommand command)
+        {
+            var go = new GameObject("Water", typeof(Box3DWater));
+            Place(go, command, "Create Box3D Water");
+        }
+
+        [MenuItem(Root + "Waterfall", false, 34)]
+        private static void CreateWaterfall(MenuCommand command)
+        {
+            var go = new GameObject("Waterfall", typeof(Box3DWaterfall));
+            // Aim slightly downward out of the box so the default drop reads as a waterfall.
+            go.transform.rotation = Quaternion.Euler(15f, 0f, 0f);
+            Place(go, command, "Create Box3D Waterfall");
         }
 
         [MenuItem(Root + "Static Box", false, 40)]

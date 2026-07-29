@@ -146,6 +146,35 @@ namespace Box3D.Hybrid
                     body.ApplyMoveEvent(moveEvent.Transform);
                 }
             }
+
+            // Impacts, delivered after the move sync so receivers see settled transforms. The
+            // native normal points from shape A to shape B: it is the impact direction into B,
+            // its negation the impact direction into A.
+            foreach (ContactHitEvent hitEvent in _world.GetContactEvents().Hit)
+            {
+                Box3DBody bodyA = BodyFromShape(hitEvent.ShapeIdA);
+                Box3DBody bodyB = BodyFromShape(hitEvent.ShapeIdB);
+                if (bodyA && bodyA.WantsHits)
+                {
+                    bodyA.DispatchHit(new Box3DHit { Point = hitEvent.Point, Direction = -hitEvent.Normal,
+                        ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyB });
+                }
+                if (bodyB && bodyB.WantsHits)
+                {
+                    bodyB.DispatchHit(new Box3DHit { Point = hitEvent.Point, Direction = hitEvent.Normal,
+                        ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyA });
+                }
+            }
+        }
+
+        // Maps a hit event's shape back to its component through the body GCHandle in shape userData
+        // (zero for shapes that created their own static body, or preview shapes).
+        private static Box3DBody BodyFromShape(ShapeId shapeId)
+        {
+            var shape = new Shape { Id = shapeId };
+            if (!shape.IsValid) return null;
+            IntPtr userData = shape.UserData;
+            return userData == IntPtr.Zero ? null : GCHandle.FromIntPtr(userData).Target as Box3DBody;
         }
 
         private void LateUpdate()

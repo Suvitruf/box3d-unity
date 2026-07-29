@@ -52,9 +52,16 @@ HeightField field = HeightField.Create(heights, countX, countZ, scale, minHeight
 ground.CreateHeightFieldShape(ShapeDef.Default, field);
 ```
 
-Heights are row-major `countX × countZ`. The min/max heights define the quantization range — use
-identical values on adjacent fields that must line up seamlessly. Same referenced-lifetime rule as
-meshes.
+Heights are row-major `countX × countZ` (`index = z * countX + x`; +X spans columns, +Z rows, from
+a corner origin at the body position). `scale` is (cell size X, height multiplier, cell size Z) and
+the default counter-clockwise winding faces the surface up. The min/max heights define the
+quantization range — use identical values on adjacent fields that must line up seamlessly. Optional
+per-quad material indices (`(countX-1) × (countZ-1)`, same ordering) flow into hit events, and
+`HeightField.HoleMaterial` (0xFF) carves a quad out of the collision. Same referenced-lifetime rule
+as meshes.
+
+In the component layer, `Box3DTerrainShape` builds all of this straight from a Unity `Terrain` —
+heightmap, size, and painted holes — see [Components](components.md).
 
 ## Compounds
 

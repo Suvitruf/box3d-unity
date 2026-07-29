@@ -8,3 +8,7 @@ Box3D.Native~/bindgen/generated/
 .DS_Store
 Thumbs.db
 
+
+# Unity's hidden folders end with '~' (Samples~, Documentation~) — the global '*~'
+# backup-file pattern must not hide new files inside them from git.
+!*~/
