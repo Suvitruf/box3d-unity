@@ -19,7 +19,9 @@ namespace Box3D
     /// or a loaded file). Step or seek to any frame and inspect the replayed <see cref="World"/> — draw
     /// it, query contacts, read body transforms — and detect where a replay diverges from the original
     /// (non-determinism), including the first divergent frame. Replay at a different worker count than
-    /// it was recorded to test cross-thread determinism. Owns a native world — call <see cref="Destroy"/>.</summary>
+    /// it was recorded to test cross-thread determinism. Owns a native world — call <see cref="Destroy"/>.
+    /// <para>Value type: copies share one native pointer — call <see cref="Destroy"/> exactly once,
+    /// through one copy; other copies still report <see cref="IsCreated"/> but dangle.</para></summary>
     public struct ReplayPlayer
     {
         private IntPtr _handle; // b3RecPlayer*

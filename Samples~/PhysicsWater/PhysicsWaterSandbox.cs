@@ -36,12 +36,23 @@ public class PhysicsWaterSandbox : MonoBehaviour
     private Box3DBody[] _props;
     private Vector3[] _homes;
     private Quaternion[] _homeRotations;
+    private readonly System.Collections.Generic.List<Material> _materials =
+        new System.Collections.Generic.List<Material>();
 
     private void Start()
     {
         _camera = Camera.main;
         BuildPool();
         BuildProps();
+    }
+
+    private void OnDestroy()
+    {
+        foreach (Material material in _materials)
+        {
+            if (material) Destroy(material);
+        }
+        _materials.Clear();
     }
 
     // --- scene building (primitives, so the sample needs no asset dependencies) ---
@@ -129,11 +140,14 @@ public class PhysicsWaterSandbox : MonoBehaviour
         return go;
     }
 
-    private static Material Mat(Color color)
+    // Tracked so OnDestroy can free them — runtime materials aren't destroyed with their objects.
+    private Material Mat(Color color)
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
         if (!shader) shader = Shader.Find("Standard");
-        return new Material(shader) { color = color };
+        var material = new Material(shader) { color = color };
+        _materials.Add(material);
+        return material;
     }
 
     // --- props / drag / GUI ---

@@ -15,6 +15,21 @@ namespace Box3D.Hybrid.Editor
         private readonly BoxBoundsHandle _volumeHandle = new BoxBoundsHandle();
         private readonly BoxBoundsHandle _boundsHandle = new BoxBoundsHandle();
 
+        private SerializedProperty _volumeProp;
+        private SerializedProperty _boundsProp;
+
+        // Pipeline-flag results cached with a 1 s refresh: reading them is reflection
+        // (GetProperty + GetValue), and the inspector runs two passes per repaint.
+        private double _nextPipelineCheck;
+        private bool _depthTextureOff;
+        private bool _opaqueTextureOff;
+
+        private void OnEnable()
+        {
+            _volumeProp = serializedObject.FindProperty("VolumeSize");
+            _boundsProp = serializedObject.FindProperty("BoundsSize");
+        }
+
         public override void OnInspectorGUI()
         {
             if (!SystemInfo.supportsComputeShaders)
@@ -27,10 +42,20 @@ namespace Box3D.Hybrid.Editor
             }
             else
             {
-                WarnIfPipelineFlagOff("supportsCameraDepthTexture",
-                    "Depth Texture is disabled in the render pipeline asset — the water surface needs it to sit correctly in the scene.");
-                WarnIfPipelineFlagOff("supportsCameraOpaqueTexture",
-                    "Opaque Texture is disabled in the render pipeline asset — the water will fall back to plain transparency instead of refracting the scene.");
+                if (EditorApplication.timeSinceStartup >= _nextPipelineCheck)
+                {
+                    _nextPipelineCheck = EditorApplication.timeSinceStartup + 1.0;
+                    _depthTextureOff = IsPipelineFlagOff("supportsCameraDepthTexture");
+                    _opaqueTextureOff = IsPipelineFlagOff("supportsCameraOpaqueTexture");
+                }
+                if (_depthTextureOff)
+                {
+                    EditorGUILayout.HelpBox("Depth Texture is disabled in the render pipeline asset — the water surface needs it to sit correctly in the scene.", MessageType.Warning);
+                }
+                if (_opaqueTextureOff)
+                {
+                    EditorGUILayout.HelpBox("Opaque Texture is disabled in the render pipeline asset — the water will fall back to plain transparency instead of refracting the scene.", MessageType.Warning);
+                }
             }
 
             DrawDefaultInspector();
@@ -56,22 +81,19 @@ namespace Box3D.Hybrid.Editor
             }
         }
 
-        private static void WarnIfPipelineFlagOff(string property, string message)
+        private static bool IsPipelineFlagOff(string property)
         {
             var prop = GraphicsSettings.currentRenderPipeline.GetType().GetProperty(property);
-            if (prop != null && prop.PropertyType == typeof(bool) &&
-                !(bool)prop.GetValue(GraphicsSettings.currentRenderPipeline))
-            {
-                EditorGUILayout.HelpBox(message, MessageType.Warning);
-            }
+            return prop != null && prop.PropertyType == typeof(bool) &&
+                   !(bool)prop.GetValue(GraphicsSettings.currentRenderPipeline);
         }
 
         private void OnSceneGUI()
         {
             var water = (Box3DWater)target;
             serializedObject.Update();
-            SerializedProperty volume = serializedObject.FindProperty("VolumeSize");
-            SerializedProperty bounds = serializedObject.FindProperty("BoundsSize");
+            SerializedProperty volume = _volumeProp;
+            SerializedProperty bounds = _boundsProp;
 
             // Fill volume: local, rotates with the object.
             _volumeHandle.center = Vector3.zero;

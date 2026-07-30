@@ -32,6 +32,20 @@ namespace Box3D
 
         public void Dispose()
         {
+            DisposeNative();
+            GC.SuppressFinalize(this);
+        }
+
+        // Backstop for a leaked instance: frees the native node pool from the finalizer thread
+        // (safe — the pool is plain malloc/free memory, untouched by any world). Dispose remains
+        // the correct path; the finalizer only limits the damage of forgetting it.
+        ~DynamicTree()
+        {
+            DisposeNative();
+        }
+
+        private void DisposeNative()
+        {
             if (_tree == null) return;
             UnsafeBindings.b3DynamicTree_Destroy(_tree);
             Marshal.FreeHGlobal((IntPtr)_tree);

@@ -172,5 +172,6 @@ public class Box3DClothSandbox : MonoBehaviour
     private void OnDestroy()
     {
         if (_world.IsValid) _world.Destroy();
+        _visual?.Destroy();
     }
 }

@@ -18,9 +18,11 @@ public class Box3DMeshTerrain : MonoBehaviour
     [SerializeField, Tooltip("Material for the terrain surface.")]
     private Material Material;
 
+    private Mesh _mesh;
+
     private void Start()
     {
-        Mesh mesh = BuildMesh();
+        Mesh mesh = _mesh = BuildMesh();
 
         // Inactive during setup so Box3DBody.Awake creates the shape after SetMesh/BodyType are set.
         var terrain = new GameObject("Mesh Terrain (generated)");
@@ -35,6 +37,11 @@ public class Box3DMeshTerrain : MonoBehaviour
         terrain.AddComponent<Box3DBody>().BodyType = Box3DBodyType.Static;
 
         terrain.SetActive(true);
+    }
+
+    private void OnDestroy()
+    {
+        if (_mesh) Destroy(_mesh); // runtime mesh — not freed with the GameObject
     }
 
     private Mesh BuildMesh()

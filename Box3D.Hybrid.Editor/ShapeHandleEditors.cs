@@ -11,12 +11,21 @@ namespace Box3D.Hybrid.Editor
     public class Box3DSphereShapeEditor : UnityEditor.Editor
     {
         private readonly SphereBoundsHandle _handle = new SphereBoundsHandle();
+        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
+        private SerializedProperty _radius;
+        private SerializedProperty _center;
+
+        private void OnEnable()
+        {
+            _radius = serializedObject.FindProperty("Radius");
+            _center = serializedObject.FindProperty("Center");
+        }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DSphereShape)target).transform;
-            SerializedProperty radius = serializedObject.FindProperty("Radius");
-            SerializedProperty center = serializedObject.FindProperty("Center");
+            SerializedProperty radius = _radius;
+            SerializedProperty center = _center;
 
             float scale = Mathf.Max(0.0001f, ShapeHandleMath.MaxAbs(t.lossyScale));
             using (new Handles.DrawingScope(Matrix4x4.TRS(t.position, t.rotation, Vector3.one)))
@@ -42,12 +51,21 @@ namespace Box3D.Hybrid.Editor
     public class Box3DBoxShapeEditor : UnityEditor.Editor
     {
         private readonly BoxBoundsHandle _handle = new BoxBoundsHandle();
+        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
+        private SerializedProperty _size;
+        private SerializedProperty _center;
+
+        private void OnEnable()
+        {
+            _size = serializedObject.FindProperty("Size");
+            _center = serializedObject.FindProperty("Center");
+        }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DBoxShape)target).transform;
-            SerializedProperty size = serializedObject.FindProperty("Size");
-            SerializedProperty center = serializedObject.FindProperty("Center");
+            SerializedProperty size = _size;
+            SerializedProperty center = _center;
 
             Vector3 scale = ShapeHandleMath.Abs(t.lossyScale);
             using (new Handles.DrawingScope(Matrix4x4.TRS(t.position, t.rotation, Vector3.one)))
@@ -74,14 +92,27 @@ namespace Box3D.Hybrid.Editor
     public class Box3DCapsuleShapeEditor : UnityEditor.Editor
     {
         private readonly CapsuleBoundsHandle _handle = new CapsuleBoundsHandle();
+        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
+        private SerializedProperty _radius;
+        private SerializedProperty _height;
+        private SerializedProperty _center;
+        private SerializedProperty _direction;
+
+        private void OnEnable()
+        {
+            _radius = serializedObject.FindProperty("Radius");
+            _height = serializedObject.FindProperty("Height");
+            _center = serializedObject.FindProperty("Center");
+            _direction = serializedObject.FindProperty("Direction");
+        }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DCapsuleShape)target).transform;
-            SerializedProperty radius = serializedObject.FindProperty("Radius");
-            SerializedProperty height = serializedObject.FindProperty("Height");
-            SerializedProperty center = serializedObject.FindProperty("Center");
-            int direction = serializedObject.FindProperty("Direction").enumValueIndex; // 0=X, 1=Y, 2=Z
+            SerializedProperty radius = _radius;
+            SerializedProperty height = _height;
+            SerializedProperty center = _center;
+            int direction = _direction.enumValueIndex; // 0=X, 1=Y, 2=Z
 
             Vector3 absScale = ShapeHandleMath.Abs(t.lossyScale);
             float axisScale = Mathf.Max(0.0001f, absScale[direction]);

@@ -9,7 +9,9 @@ namespace Box3D
     /// for lockstep/rollback netcode), <see cref="SaveToFile"/> it, or play it back with a ReplayPlayer.
     ///
     /// <para>Owns native memory — call <see cref="Destroy"/> when done. The bytes from
-    /// <see cref="GetData"/> are valid only until then.</para></summary>
+    /// <see cref="GetData"/> are valid only until then.</para>
+    /// <para>Value type: copies share one native pointer — call <see cref="Destroy"/> exactly once,
+    /// through one copy; other copies still report <see cref="IsCreated"/> but dangle.</para></summary>
     public struct Recording
     {
         private IntPtr _handle; // b3Recording*

@@ -63,6 +63,11 @@ public class UnityClothSandbox : MonoBehaviour
         _visual = new ClothMeshVisual(Width, Height);
     }
 
+    private void OnDestroy()
+    {
+        _visual?.Destroy();
+    }
+
     private void CreateEnvironment()
     {
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);

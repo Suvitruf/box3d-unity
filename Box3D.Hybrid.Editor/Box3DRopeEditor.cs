@@ -18,6 +18,7 @@ namespace Box3D.Hybrid.Editor
         private bool _simulating;
         private Vector3 _lastStart;
         private Vector3 _lastEnd;
+        private double _nextDrapeTime;
 
         private Box3DRope Rope => (Box3DRope)target;
 
@@ -110,9 +111,17 @@ namespace Box3D.Hybrid.Editor
             }
 
             // Re-drape when either endpoint is moved (the running simulation follows by itself).
+            // Settling is heavy — a full preview-world build (scene scan + detached shapes) plus
+            // ~1200 solver substeps — so mid-drag it's throttled to ~6 Hz; releasing the handle
+            // (no hot control) re-drapes immediately, landing the final exact hang.
             if (!_simulating && (_lastStart != Rope.StartWorld || _lastEnd != Rope.EndWorld))
             {
-                RefreshPreview();
+                bool dragging = GUIUtility.hotControl != 0;
+                if (!dragging || EditorApplication.timeSinceStartup >= _nextDrapeTime)
+                {
+                    _nextDrapeTime = EditorApplication.timeSinceStartup + 0.15;
+                    RefreshPreview();
+                }
             }
         }
 

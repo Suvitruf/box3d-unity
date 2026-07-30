@@ -30,6 +30,10 @@ namespace Box3D
         private static readonly PreSolveCallback[] PreSolves = new PreSolveCallback[UnsafeBindings.B3_MAX_WORLDS + 1];
         private static MaterialMixCallback _frictionMix;
         private static MaterialMixCallback _restitutionMix;
+        // The world that registered each global mixer, so ONLY its death clears the delegate —
+        // destroying an unrelated world must not silently revert live worlds to default mixing.
+        private static WorldId _frictionMixOwner;
+        private static WorldId _restitutionMixOwner;
 
         private static readonly b3CustomFilterFcn CustomFilterDelegate = OnCustomFilter;
         private static readonly IntPtr CustomFilterPtr = Marshal.GetFunctionPointerForDelegate(CustomFilterDelegate);
@@ -132,6 +136,7 @@ namespace Box3D
         public void SetFrictionCallback(MaterialMixCallback callback)
         {
             _frictionMix = callback;
+            _frictionMixOwner = Id;
             UnsafeBindings.b3World_SetFrictionCallback(Id, callback != null ? FrictionPtr : IntPtr.Zero);
         }
 
@@ -141,6 +146,7 @@ namespace Box3D
         public void SetRestitutionCallback(MaterialMixCallback callback)
         {
             _restitutionMix = callback;
+            _restitutionMixOwner = Id;
             UnsafeBindings.b3World_SetRestitutionCallback(Id, callback != null ? RestitutionPtr : IntPtr.Zero);
         }
 
@@ -149,10 +155,12 @@ namespace Box3D
             CustomFilters[Id.Index1] = null;
             PreSolves[Id.Index1] = null;
             DebugDrawBridge.SetBridgeOwned(Id, false);
-            // The mixers are global (see SetFrictionCallback) — clearing on any world destroy
-            // prevents the last registered delegate (and its closure) from being rooted forever.
-            _frictionMix = null;
-            _restitutionMix = null;
+            // The mixers are global (see SetFrictionCallback) — clear when the world that
+            // registered one dies, so its delegate (and closure) isn't rooted forever. Other
+            // worlds' destroys leave them alone: a live world that registered a mixer must not
+            // silently revert to engine-default mixing because an unrelated world went away.
+            if (_frictionMix != null && _frictionMixOwner.Equals(Id)) _frictionMix = null;
+            if (_restitutionMix != null && _restitutionMixOwner.Equals(Id)) _restitutionMix = null;
         }
     }
 }

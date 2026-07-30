@@ -30,6 +30,10 @@ namespace Box3D.Hybrid
         [SerializeField, Min(0.01f), Tooltip("Playback speed multiplier.")]
         private float Speed = 1f;
 
+        // After an editor/frame hitch, catching up the full backlog in one Update could mean
+        // hundreds of native steps — cap it and drop the rest.
+        private const int MaxCatchUpSteps = 8;
+
         private ReplayPlayer _player;
         private bool _isPlaying;
         private float _timeStep;
@@ -87,11 +91,14 @@ namespace Box3D.Hybrid
             if (_isPlaying && _timeStep > 0f)
             {
                 _accum += Time.deltaTime * Speed;
-                while (_accum >= _timeStep)
+                int steps = 0;
+                while (_accum >= _timeStep && steps < MaxCatchUpSteps)
                 {
                     _accum -= _timeStep;
                     if (!_player.StepFrame()) { _isPlaying = false; break; }
+                    steps++;
                 }
+                if (steps == MaxCatchUpSteps) _accum = 0f; // hitch — drop the backlog, don't chase it
             }
 
             _player.World.DrawDebug(DebugDraw, DrawRadius);

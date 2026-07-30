@@ -30,6 +30,7 @@ namespace Box3D.Hybrid
         private int FontSize = 14;
 
         private Box3DWorld _world;
+        private bool _worldSearched;
         private Profile _profile;
         private Counters _counters;
         private int _awakeBodies;
@@ -37,10 +38,21 @@ namespace Box3D.Hybrid
         private float _fps;
         private GUIStyle _style;
         private Texture2D _backdrop;
+        // Built once per frame here; OnGUI runs (at least) twice per frame and would otherwise
+        // rebuild the string and a GUIContent per pass.
+        private readonly GUIContent _content = new GUIContent();
 
         private void LateUpdate()
         {
-            if (!_world) _world = Box3DWorld.Instance;
+            // One-shot acquisition: Box3DWorld.Instance scene-searches and AUTO-CREATES a world
+            // when none exists — retrying every frame would make a diagnostics overlay respawn
+            // physics after the world it was watching died.
+            if (!_world)
+            {
+                if (_worldSearched) return;
+                _worldSearched = true;
+                _world = Box3DWorld.Instance;
+            }
             World world = _world ? _world.World : default;
             if (!world.IsValid) return;
 
@@ -51,6 +63,8 @@ namespace Box3D.Hybrid
             // Smooth the noisy per-step values so they're readable.
             _stepMs = Mathf.Lerp(_stepMs, _profile.Step, 0.1f);
             _fps = Mathf.Lerp(_fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 1e-5f), 0.1f);
+
+            if (Visible) _content.text = BuildText();
         }
 
         /// <summary>Toggles the overlay — bind it to a key from your own input handling.</summary>
@@ -58,18 +72,17 @@ namespace Box3D.Hybrid
 
         private void OnGUI()
         {
-            if (!Visible || !_world) return;
+            if (!Visible || !_world || string.IsNullOrEmpty(_content.text)) return;
 
             EnsureStyle();
-            string text = BuildText();
-            Vector2 size = _style.CalcSize(new GUIContent(text));
+            Vector2 size = _style.CalcSize(_content);
             var rect = new Rect(PlaceX(size.x), PlaceY(size.y), size.x, size.y);
 
             Color prev = GUI.color;
             GUI.color = new Color(0f, 0f, 0f, 0.65f);
             GUI.DrawTexture(rect, _backdrop);
             GUI.color = prev;
-            GUI.Label(rect, text, _style);
+            GUI.Label(rect, _content, _style);
         }
 
         private string BuildText()

@@ -9,11 +9,33 @@ namespace Box3D.Hybrid.Editor
     [CanEditMultipleObjects]
     public class Box3DWaterfallEditor : UnityEditor.Editor
     {
+        private SerializedProperty _waterProp;
+        // The "is there any water in the scene?" scan, run once and then only when the hierarchy
+        // actually changes — not on every GUI event.
+        private bool _sceneHasWater;
+        private bool _scanned;
+
+        private void OnEnable()
+        {
+            _waterProp = serializedObject.FindProperty("Water");
+            EditorApplication.hierarchyChanged += InvalidateScan;
+        }
+
+        private void OnDisable()
+        {
+            EditorApplication.hierarchyChanged -= InvalidateScan;
+        }
+
+        private void InvalidateScan() => _scanned = false;
+
         public override void OnInspectorGUI()
         {
-            SerializedProperty waterProp = serializedObject.FindProperty("Water");
-            if (waterProp.objectReferenceValue == null &&
-                !Object.FindAnyObjectByType<Box3DWater>(FindObjectsInactive.Include))
+            if (!_waterProp.objectReferenceValue && !_scanned)
+            {
+                _scanned = true;
+                _sceneHasWater = Object.FindAnyObjectByType<Box3DWater>(FindObjectsInactive.Include);
+            }
+            if (!_waterProp.objectReferenceValue && !_sceneHasWater)
             {
                 EditorGUILayout.HelpBox("There is no Box3DWater in the scene to pour into.", MessageType.Warning);
                 if (GUILayout.Button("Create Water"))

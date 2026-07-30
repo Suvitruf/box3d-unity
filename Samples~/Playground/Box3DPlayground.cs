@@ -46,6 +46,8 @@ public class Box3DPlayground : MonoBehaviour
     private Body _mouseAnchor;
     private Camera _camera;
     private Texture2D _checker;
+    private Material _beltMaterial;
+    private GUIStyle _headerStyle; // created once inside OnGUI (GUI.skin is only valid there)
     private readonly List<SpawnedObject> _objects = new List<SpawnedObject>();
 
     private int _shapeIndex;
@@ -114,9 +116,9 @@ public class Box3DPlayground : MonoBehaviour
         visual.transform.localScale = new Vector3(3f, 0.3f, 10f);
         Destroy(visual.GetComponent<Collider>());
         MeshRenderer beltRenderer = visual.GetComponent<MeshRenderer>();
-        Material beltMaterial = CreateInstanceMaterial(beltRenderer);
-        beltMaterial.color = new Color(0.25f, 0.45f, 0.9f);
-        beltRenderer.sharedMaterial = beltMaterial;
+        _beltMaterial = CreateInstanceMaterial(beltRenderer);
+        _beltMaterial.color = new Color(0.25f, 0.45f, 0.9f);
+        beltRenderer.sharedMaterial = _beltMaterial;
     }
 
     private void CreateSeesaw()
@@ -246,8 +248,8 @@ public class Box3DPlayground : MonoBehaviour
             }
         }
 
-        renderer.material.mainTexture = _checker;
-        Register(body, visual, renderer, tint, persistent: false);
+        // Set the checker on the instance Register creates — the one the object renders with.
+        Register(body, visual, renderer, tint, persistent: false).mainTexture = _checker;
     }
 
     private (Transform, MeshRenderer) CreateVisual(PrimitiveType primitive, Vector3 scale)
@@ -276,12 +278,14 @@ public class Box3DPlayground : MonoBehaviour
             ball.transform.SetParent(root.transform, false);
             ball.transform.localPosition = new Vector3(0.45f * side, 0f, 0f);
             ball.transform.localScale = Vector3.one * 0.56f;
-            ball.GetComponent<MeshRenderer>().sharedMaterial = mainRenderer.material;
+            // sharedMaterial: Register assigns the real instance to every child right after —
+            // instantiating here (renderer.material) would only orphan a material.
+            ball.GetComponent<MeshRenderer>().sharedMaterial = mainRenderer.sharedMaterial;
         }
         return (root.transform, mainRenderer);
     }
 
-    private void Register(Body body, Transform visual, MeshRenderer renderer, Color tint, bool persistent)
+    private Material Register(Body body, Transform visual, MeshRenderer renderer, Color tint, bool persistent)
     {
         body.UserData = (IntPtr)_objects.Count;
         Material material = CreateInstanceMaterial(renderer);
@@ -299,6 +303,7 @@ public class Box3DPlayground : MonoBehaviour
             BaseColor = tint,
             Persistent = persistent,
         });
+        return material;
     }
 
     private void ClearSpawned()
@@ -314,6 +319,7 @@ public class Box3DPlayground : MonoBehaviour
             }
             entry.Body.Destroy();
             Destroy(entry.Visual.gameObject);
+            if (entry.Material) Destroy(entry.Material); // runtime instance — not freed with the GameObject
         }
         _objects.Clear();
         _objects.AddRange(kept);
@@ -495,7 +501,8 @@ public class Box3DPlayground : MonoBehaviour
     private void OnGUI()
     {
         GUILayout.BeginArea(_panelRect, GUI.skin.box);
-        GUILayout.Label("<b>Spawn</b>", new GUIStyle(GUI.skin.label) { richText = true });
+        _headerStyle ??= new GUIStyle(GUI.skin.label) { richText = true };
+        GUILayout.Label("<b>Spawn</b>", _headerStyle);
         _shapeIndex = GUILayout.SelectionGrid(_shapeIndex, ShapeNames, 2);
 
         GUILayout.Space(6f);
@@ -528,6 +535,13 @@ public class Box3DPlayground : MonoBehaviour
     private void OnDestroy()
     {
         if (_world.IsValid) _world.Destroy();
+        foreach (SpawnedObject entry in _objects)
+        {
+            if (entry.Material) Destroy(entry.Material);
+        }
+        _objects.Clear();
+        if (_beltMaterial) Destroy(_beltMaterial);
+        if (_checker) Destroy(_checker);
     }
 }
 #else

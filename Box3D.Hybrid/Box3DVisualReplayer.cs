@@ -27,9 +27,14 @@ namespace Box3D.Hybrid
         [SerializeField, Min(0.01f), Tooltip("Playback speed multiplier.")]
         private float Speed = 1f;
 
+        // After an editor/frame hitch, catching up the full backlog in one Update could mean
+        // hundreds of native steps — cap it and drop the rest.
+        private const int MaxCatchUpSteps = 8;
+
         private ReplayPlayer _player;
         private Box3DWorld _world;
         private Transform[] _targets; // replay body index -> scene transform (null = unmapped / hole)
+        private Body[] _replayBodies; // replay body handles, resolved once at mapping time
         private bool _isPlaying;
         private bool _pendingLoad;
         private float _timeStep;
@@ -108,11 +113,12 @@ namespace Box3D.Hybrid
 
             int count = _player.BodyCount;
             _targets = new Transform[count];
+            _replayBodies = new Body[count];
             var cursor = new Dictionary<string, int>();
             int mapped = 0, duplicates = 0;
             for (int i = 0; i < count; i++)
             {
-                Body replayBody = _player.GetBody(i);
+                Body replayBody = _replayBodies[i] = _player.GetBody(i);
                 if (!replayBody.IsValid) continue; // hole left by a destroyed body
                 string name = replayBody.GetName();
                 if (!byName.TryGetValue(name, out List<Transform> list)) continue;
@@ -159,12 +165,15 @@ namespace Box3D.Hybrid
 
             _accum += Time.deltaTime * Speed;
             bool advanced = false;
-            while (_accum >= _timeStep)
+            int steps = 0;
+            while (_accum >= _timeStep && steps < MaxCatchUpSteps)
             {
                 _accum -= _timeStep;
                 if (!_player.StepFrame()) { _isPlaying = false; break; }
                 advanced = true;
+                steps++;
             }
+            if (steps == MaxCatchUpSteps) _accum = 0f; // hitch — drop the backlog, don't chase it
             if (advanced) ApplyFrame();
         }
 
@@ -175,11 +184,12 @@ namespace Box3D.Hybrid
             {
                 Transform target = _targets[i];
                 if (!target) continue;
-                Body replayBody = _player.GetBody(i);
+                // Cached handle + a single GetTransform: half the native calls of re-resolving
+                // the body and reading Position/Rotation separately every frame.
+                Body replayBody = _replayBodies[i];
                 if (!replayBody.IsValid) continue;
-                Vector3 position = (Vector3)replayBody.Position;
-                Quaternion rotation = replayBody.Rotation;
-                target.SetPositionAndRotation(position, rotation);
+                B3Transform tf = replayBody.GetTransform().ToB3Transform();
+                target.SetPositionAndRotation((Vector3)tf.Position, tf.Rotation);
             }
         }
 

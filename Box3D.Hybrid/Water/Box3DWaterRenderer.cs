@@ -32,6 +32,7 @@ namespace Box3D.Hybrid
         private MeshRenderer _surfaceRenderer;
         private Mesh _triangleMesh;
         private bool _refractionAvailable;
+        private bool? _refractApplied; // last keyword/blend state pushed to the surface material
 
         public Box3DWaterRenderer(Box3DWater water) => _water = water;
 
@@ -135,13 +136,13 @@ namespace Box3D.Hybrid
             Matrix4x4 gpuProj = GL.GetGPUProjectionMatrix(camera.projectionMatrix, true);
 
             _cmd.Clear();
-            _cmd.SetGlobalBuffer("_Box3DWaterPositions", _water.ParticleBuffer);
-            _cmd.SetGlobalBuffer("_Box3DWaterVelocities", _water.VelocityBuffer);
-            _cmd.SetGlobalMatrix("_Box3DWaterView", view);
-            _cmd.SetGlobalMatrix("_Box3DWaterProj", gpuProj);
-            _cmd.SetGlobalFloat("_Box3DWaterRenderRadius", _water.RenderRadius);
-            _cmd.SetGlobalFloat("_Box3DWaterThicknessScale", 1f);
-            _cmd.SetGlobalFloat("_Box3DWaterStretch", _water.SurfaceFoamStretch);
+            _cmd.SetGlobalBuffer(ShaderIds.Box3DWaterPositions, _water.ParticleBuffer);
+            _cmd.SetGlobalBuffer(ShaderIds.Box3DWaterVelocities, _water.VelocityBuffer);
+            _cmd.SetGlobalMatrix(ShaderIds.Box3DWaterView, view);
+            _cmd.SetGlobalMatrix(ShaderIds.Box3DWaterProj, gpuProj);
+            _cmd.SetGlobalFloat(ShaderIds.Box3DWaterRenderRadius, _water.RenderRadius);
+            _cmd.SetGlobalFloat(ShaderIds.Box3DWaterThicknessScale, 1f);
+            _cmd.SetGlobalFloat(ShaderIds.Box3DWaterStretch, _water.SurfaceFoamStretch);
 
             // Sphere-impostor eye depth, hardware z-tested against itself.
             _cmd.SetRenderTarget(targets.Depth);
@@ -167,8 +168,8 @@ namespace Box3D.Hybrid
                 float projScaleY = camera.projectionMatrix[1, 1];
                 float pixelsPerMeter = projScaleY * targets.Depth.height * 0.5f;
                 float depthScale = _water.SmoothingWorldRadius * _water.SurfaceSmoothing * pixelsPerMeter;
-                _cmd.SetGlobalFloat("_Box3DWaterBlurDepthScale", depthScale);
-                _cmd.SetGlobalFloat("_Box3DWaterBlurFalloff", _water.SmoothingWorldRadius * 2f);
+                _cmd.SetGlobalFloat(ShaderIds.Box3DWaterBlurDepthScale, depthScale);
+                _cmd.SetGlobalFloat(ShaderIds.Box3DWaterBlurFalloff, _water.SmoothingWorldRadius * 2f);
                 var texel = new Vector4(1f / targets.Depth.width, 1f / targets.Depth.height,
                     targets.Depth.width, targets.Depth.height);
 
@@ -182,12 +183,12 @@ namespace Box3D.Hybrid
                 // splats read as a pile of coins/one white ball. A plain Gaussian each (footprint
                 // taken from the smoothed depth) melts them into continuous fields; foam gets a
                 // wider pass so whitewater reads as spray rather than discrete splats.
-                _cmd.SetGlobalTexture("_Box3DWaterBlurDepth", targets.Depth);
+                _cmd.SetGlobalTexture(ShaderIds.Box3DWaterBlurDepth, targets.Depth);
                 BlurPass(targets.Thickness, targets.BlurTmp, new Vector2(1f, 0f), texel, pass: 1);
                 BlurPass(targets.BlurTmp, targets.Thickness, new Vector2(0f, 1f), texel, pass: 1);
                 if (_water.SurfaceFoam > 0f)
                 {
-                    _cmd.SetGlobalFloat("_Box3DWaterBlurDepthScale", depthScale * 1.5f);
+                    _cmd.SetGlobalFloat(ShaderIds.Box3DWaterBlurDepthScale, depthScale * 1.5f);
                     BlurPass(targets.Foam, targets.BlurTmp, new Vector2(1f, 0f), texel, pass: 1);
                     BlurPass(targets.BlurTmp, targets.Foam, new Vector2(0f, 1f), texel, pass: 1);
                 }
@@ -198,45 +199,82 @@ namespace Box3D.Hybrid
             // Per-camera surface inputs; cameras render one after another, so material state set
             // here is what this camera's transparent pass records.
             Matrix4x4 proj = camera.projectionMatrix;
-            _surfaceMat.SetTexture("_Box3DWaterDepthTex", targets.Depth);
-            _surfaceMat.SetTexture("_Box3DWaterThickTex", targets.Thickness);
-            _surfaceMat.SetTexture("_Box3DWaterFoamTex", targets.Foam);
-            _surfaceMat.SetMatrix("_Box3DWaterCamToWorld", camera.cameraToWorldMatrix);
-            _surfaceMat.SetVector("_Box3DWaterProjExtents", new Vector4(1f / proj[0, 0], 1f / proj[1, 1], 0f, 0f));
+            _surfaceMat.SetTexture(ShaderIds.Box3DWaterDepthTex, targets.Depth);
+            _surfaceMat.SetTexture(ShaderIds.Box3DWaterThickTex, targets.Thickness);
+            _surfaceMat.SetTexture(ShaderIds.Box3DWaterFoamTex, targets.Foam);
+            _surfaceMat.SetMatrix(ShaderIds.Box3DWaterCamToWorld, camera.cameraToWorldMatrix);
+            _surfaceMat.SetVector(ShaderIds.Box3DWaterProjExtents, new Vector4(1f / proj[0, 0], 1f / proj[1, 1], 0f, 0f));
             PushSurfaceLook();
+        }
+
+        // Shader property ids resolved once: the string Set* overloads re-hash the name on
+        // every call, and these run per step / per camera per frame.
+        private static class ShaderIds
+        {
+            public static readonly int AbsorptionScale = Shader.PropertyToID("_AbsorptionScale");
+            public static readonly int Box3DWaterBlurDepth = Shader.PropertyToID("_Box3DWaterBlurDepth");
+            public static readonly int Box3DWaterBlurDepthScale = Shader.PropertyToID("_Box3DWaterBlurDepthScale");
+            public static readonly int Box3DWaterBlurDir = Shader.PropertyToID("_Box3DWaterBlurDir");
+            public static readonly int Box3DWaterBlurFalloff = Shader.PropertyToID("_Box3DWaterBlurFalloff");
+            public static readonly int Box3DWaterBlurSrc = Shader.PropertyToID("_Box3DWaterBlurSrc");
+            public static readonly int Box3DWaterBlurSrcTexelSize = Shader.PropertyToID("_Box3DWaterBlurSrc_TexelSize");
+            public static readonly int Box3DWaterCamToWorld = Shader.PropertyToID("_Box3DWaterCamToWorld");
+            public static readonly int Box3DWaterDepthTex = Shader.PropertyToID("_Box3DWaterDepthTex");
+            public static readonly int Box3DWaterFoamTex = Shader.PropertyToID("_Box3DWaterFoamTex");
+            public static readonly int Box3DWaterPositions = Shader.PropertyToID("_Box3DWaterPositions");
+            public static readonly int Box3DWaterProj = Shader.PropertyToID("_Box3DWaterProj");
+            public static readonly int Box3DWaterProjExtents = Shader.PropertyToID("_Box3DWaterProjExtents");
+            public static readonly int Box3DWaterRenderRadius = Shader.PropertyToID("_Box3DWaterRenderRadius");
+            public static readonly int Box3DWaterStretch = Shader.PropertyToID("_Box3DWaterStretch");
+            public static readonly int Box3DWaterThickTex = Shader.PropertyToID("_Box3DWaterThickTex");
+            public static readonly int Box3DWaterThicknessScale = Shader.PropertyToID("_Box3DWaterThicknessScale");
+            public static readonly int Box3DWaterTime = Shader.PropertyToID("_Box3DWaterTime");
+            public static readonly int Box3DWaterVelocities = Shader.PropertyToID("_Box3DWaterVelocities");
+            public static readonly int Box3DWaterView = Shader.PropertyToID("_Box3DWaterView");
+            public static readonly int DstBlend = Shader.PropertyToID("_DstBlend");
+            public static readonly int FoamStrength = Shader.PropertyToID("_FoamStrength");
+            public static readonly int ReflectionStrength = Shader.PropertyToID("_ReflectionStrength");
+            public static readonly int RefractionStrength = Shader.PropertyToID("_RefractionStrength");
+            public static readonly int ShoreBlend = Shader.PropertyToID("_ShoreBlend");
+            public static readonly int SrcBlend = Shader.PropertyToID("_SrcBlend");
+            public static readonly int TintColor = Shader.PropertyToID("_TintColor");
         }
 
         private void BlurPass(RenderTexture src, RenderTexture dst, Vector2 dir, Vector4 texel, int pass)
         {
-            _cmd.SetGlobalTexture("_Box3DWaterBlurSrc", src);
-            _cmd.SetGlobalVector("_Box3DWaterBlurSrc_TexelSize", texel);
-            _cmd.SetGlobalVector("_Box3DWaterBlurDir", dir);
+            _cmd.SetGlobalTexture(ShaderIds.Box3DWaterBlurSrc, src);
+            _cmd.SetGlobalVector(ShaderIds.Box3DWaterBlurSrcTexelSize, texel);
+            _cmd.SetGlobalVector(ShaderIds.Box3DWaterBlurDir, dir);
             _cmd.SetRenderTarget(dst);
             _cmd.DrawProcedural(Matrix4x4.identity, _blurMat, pass, MeshTopology.Triangles, 3);
         }
 
         private void PushSurfaceLook()
         {
-            _surfaceMat.SetColor("_TintColor", _water.SurfaceColor);
-            _surfaceMat.SetFloat("_FoamStrength", _water.SurfaceFoam);
-            _surfaceMat.SetFloat("_ShoreBlend", _water.SurfaceShoreBlend);
-            _surfaceMat.SetFloat("_Box3DWaterTime", Time.time);
-            _surfaceMat.SetFloat("_AbsorptionScale", _water.SurfaceAbsorption);
-            _surfaceMat.SetFloat("_RefractionStrength", _water.SurfaceRefraction * 0.15f);
-            _surfaceMat.SetFloat("_ReflectionStrength", _water.SurfaceReflection);
+            _surfaceMat.SetColor(ShaderIds.TintColor, _water.SurfaceColor);
+            _surfaceMat.SetFloat(ShaderIds.FoamStrength, _water.SurfaceFoam);
+            _surfaceMat.SetFloat(ShaderIds.ShoreBlend, _water.SurfaceShoreBlend);
+            _surfaceMat.SetFloat(ShaderIds.Box3DWaterTime, Time.time);
+            _surfaceMat.SetFloat(ShaderIds.AbsorptionScale, _water.SurfaceAbsorption);
+            _surfaceMat.SetFloat(ShaderIds.RefractionStrength, _water.SurfaceRefraction * 0.15f);
+            _surfaceMat.SetFloat(ShaderIds.ReflectionStrength, _water.SurfaceReflection);
 
+            // Keyword and blend state only on change — keyword toggles do a string lookup and
+            // dirty the material, and this runs per camera per frame.
             bool refract = _refractionAvailable && _water.SurfaceRefraction > 0f;
+            if (_refractApplied == refract) return;
+            _refractApplied = refract;
             if (refract)
             {
                 _surfaceMat.EnableKeyword("_BOX3D_WATER_REFRACTION");
-                _surfaceMat.SetFloat("_SrcBlend", (float)BlendMode.One);
-                _surfaceMat.SetFloat("_DstBlend", (float)BlendMode.Zero);
+                _surfaceMat.SetFloat(ShaderIds.SrcBlend, (float)BlendMode.One);
+                _surfaceMat.SetFloat(ShaderIds.DstBlend, (float)BlendMode.Zero);
             }
             else
             {
                 _surfaceMat.DisableKeyword("_BOX3D_WATER_REFRACTION");
-                _surfaceMat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
-                _surfaceMat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+                _surfaceMat.SetFloat(ShaderIds.SrcBlend, (float)BlendMode.SrcAlpha);
+                _surfaceMat.SetFloat(ShaderIds.DstBlend, (float)BlendMode.OneMinusSrcAlpha);
             }
         }
 

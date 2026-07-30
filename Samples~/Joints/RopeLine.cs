@@ -14,4 +14,13 @@ public static class RopeLine
         line.endColor = Color.black;
         return line;
     }
+
+    /// <summary>Destroys a line made by <see cref="Create"/>, including the runtime material
+    /// (which destroying the GameObject alone would leak).</summary>
+    public static void Destroy(LineRenderer line)
+    {
+        if (!line) return;
+        Object.Destroy(line.sharedMaterial);
+        Object.Destroy(line.gameObject);
+    }
 }

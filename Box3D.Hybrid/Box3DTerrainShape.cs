@@ -180,6 +180,7 @@ namespace Box3D.Hybrid
             _registeredId = default;
             _heights = null;
             if (_field.IsCreated) _field.Destroy();
+            _field = default; // idempotent: both the shape and its Box3DBody may call this
         }
 
 #if UNITY_EDITOR

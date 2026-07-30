@@ -16,6 +16,29 @@ namespace Box3D.Hybrid.Editor
         private static bool _showContacts = true;
         private static bool _drawInScene = true;
 
+        // Per-frame snapshot: the inspector runs two IMGUI passes per repaint and the scene view
+        // fires several events per frame — fetch contacts (and the scene body list for name
+        // resolution) once per frame instead of once per pass.
+        private ContactData[] _contacts;
+        private Box3DBody[] _sceneBodies;
+        private int _snapshotFrame = -1;
+
+        private ContactData[] ContactsThisFrame(Body body)
+        {
+            if (_snapshotFrame != Time.frameCount)
+            {
+                _snapshotFrame = Time.frameCount;
+                _contacts = body.GetContacts();
+                _sceneBodies = null; // refreshed lazily, only if names are actually shown
+            }
+            return _contacts;
+        }
+
+        private Box3DBody[] SceneBodies()
+        {
+            return _sceneBodies ??= FindObjectsByType<Box3DBody>(FindObjectsSortMode.None);
+        }
+
         public override void OnInspectorGUI()
         {
             DrawDefaultInspector();
@@ -35,7 +58,7 @@ namespace Box3D.Hybrid.Editor
                 EditorGUILayout.FloatField("Speed", math.length(body.LinearVelocity));
             }
 
-            ContactData[] contacts = body.GetContacts();
+            ContactData[] contacts = ContactsThisFrame(body);
             EditorGUILayout.Space();
             _showContacts = EditorGUILayout.Foldout(_showContacts, $"Contacts ({contacts.Length})", true);
             if (!_showContacts) return;
@@ -49,7 +72,7 @@ namespace Box3D.Hybrid.Editor
             }
             else
             {
-                Box3DBody[] all = FindObjectsByType<Box3DBody>(FindObjectsSortMode.None);
+                Box3DBody[] all = SceneBodies();
                 int shown = 0;
                 foreach (ContactData c in contacts)
                 {
@@ -66,12 +89,15 @@ namespace Box3D.Hybrid.Editor
         private void OnSceneGUI()
         {
             if (!Application.isPlaying || !_showContacts || !_drawInScene) return;
+            // Handles output only matters on Repaint; without this gate every scene-view event
+            // (layout, mouse moves — 2-6 per frame) re-snapshots contacts and P/Invokes.
+            if (Event.current.type != EventType.Repaint) return;
 
             var component = (Box3DBody)target;
             Body body = component.Body;
             if (!body.IsValid) return;
 
-            foreach (ContactData c in body.GetContacts())
+            foreach (ContactData c in ContactsThisFrame(body))
             {
                 // Anchor A is relative to shape A's body's center of mass (box3d picks the A/B order).
                 Body bodyA = c.ShapeA.GetBody();

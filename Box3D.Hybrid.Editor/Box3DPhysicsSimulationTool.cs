@@ -33,6 +33,12 @@ namespace Box3D.Hybrid.Editor
         private int _undoGroup;
         private GUIContent _icon;
 
+        // Panel labels cached alongside what they describe: DrawPanel runs on every scene-view
+        // event (several per frame, continuously under RepaintAll while simulating) and would
+        // otherwise rebuild the interpolated strings each time.
+        private string _idleLabel;
+        private string _simulatingLabel;
+
         public override GUIContent toolbarIcon => _icon ??= new GUIContent(
             AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath),
             "Box3D Physics Simulation — settle the selected bodies with live physics. " +
@@ -152,18 +158,18 @@ namespace Box3D.Hybrid.Editor
 
             if (_simulation != null)
             {
-                GUILayout.Label($"Simulating {_simulation.BodyCount} " +
-                    (_simulation.BodyCount == 1 ? "body" : "bodies") + " — drag to move them.",
-                    EditorStyles.miniLabel);
+                _simulatingLabel ??= $"Simulating {_simulation.BodyCount} " +
+                    (_simulation.BodyCount == 1 ? "body" : "bodies") + " — drag to move them.";
+                GUILayout.Label(_simulatingLabel, EditorStyles.miniLabel);
                 if (GUILayout.Button("■ Stop Simulation (Space)")) StopSimulation();
             }
             else
             {
                 int count = Candidates().Count;
-                GUILayout.Label(count == 0
+                _idleLabel ??= count == 0
                     ? "Select objects with a dynamic Box3D body."
-                    : $"{count} dynamic " + (count == 1 ? "body" : "bodies") + " in selection.",
-                    EditorStyles.miniLabel);
+                    : $"{count} dynamic " + (count == 1 ? "body" : "bodies") + " in selection.";
+                GUILayout.Label(_idleLabel, EditorStyles.miniLabel);
                 using (new EditorGUI.DisabledScope(count == 0))
                 {
                     if (GUILayout.Button("▶ Start Simulation (Space)")) StartSimulation();
@@ -222,6 +228,7 @@ namespace Box3D.Hybrid.Editor
             if (_simulation == null) return;
             _simulation.Dispose();
             _simulation = null;
+            _simulatingLabel = null;
             GUIUtility.hotControl = 0; // stopping mid-drag must not leave the scene view captured
 
             // The settled poses were written straight to the Transforms — record them on prefab
@@ -245,6 +252,7 @@ namespace Box3D.Hybrid.Editor
             if (_simulation == null) return;
             _simulation.Dispose();
             _simulation = null;
+            _simulatingLabel = null;
             _running.Clear();
             GUIUtility.hotControl = 0;
             SceneView.RepaintAll();
@@ -284,7 +292,11 @@ namespace Box3D.Hybrid.Editor
 
         private void OnSceneClosing(UnityEngine.SceneManagement.Scene scene, bool removing) => DiscardSimulation();
 
-        private void InvalidateCandidates() => _candidates = null;
+        private void InvalidateCandidates()
+        {
+            _candidates = null;
+            _idleLabel = null;
+        }
 
         // Dynamic, enabled bodies for the current selection: everything under the selected roots,
         // plus the owning body when a child of a prop is selected (clicking a visual mesh still
