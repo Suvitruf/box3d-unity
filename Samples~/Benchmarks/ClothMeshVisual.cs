@@ -8,6 +8,8 @@ public class ClothMeshVisual
 {
     private readonly Mesh _mesh;
     private readonly Vector3[] _vertices;
+    private readonly GameObject _visual;
+    private readonly Material _material;
 
     public ClothMeshVisual(int width, int height)
     {
@@ -46,6 +48,18 @@ public class ClothMeshVisual
         material.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
         renderer.material = material;
         renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.TwoSided;
+
+        _visual = visual;
+        _material = material;
+    }
+
+    /// <summary>Destroys the visual GameObject and the runtime mesh/material it owns (they are
+    /// not scene objects, so destroying the GameObject alone would leak them).</summary>
+    public void Destroy()
+    {
+        if (_visual) Object.Destroy(_visual);
+        if (_mesh) Object.Destroy(_mesh);
+        if (_material) Object.Destroy(_material);
     }
 
     public void SetVertex(int index, Vector3 position)

@@ -61,6 +61,7 @@ public class PyramidBenchmark : MonoBehaviour
     private Mesh _cubeMesh;
     private Material _material;
     private Material _sphereMaterial;
+    private GUIStyle _labelStyle; // created once inside OnGUI (GUI.skin is only valid there)
     private Matrix4x4[][] _batches;   // GPU-instancing batches (≤1023 matrices each)
     private int[] _batchCounts;
     private const int BatchSize = 1023;
@@ -286,14 +287,14 @@ public class PyramidBenchmark : MonoBehaviour
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = prev;
 
-        var style = new GUIStyle(GUI.skin.label)
+        _labelStyle ??= new GUIStyle(GUI.skin.label)
         {
             fontSize = 17,
             richText = true,
             padding = new RectOffset(12, 12, 10, 10),
             normal = { textColor = Color.white },
         };
-        GUI.Label(rect, text, style);
+        GUI.Label(rect, text, _labelStyle);
     }
 
     private void OnDestroy()

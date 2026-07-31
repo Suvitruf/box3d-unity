@@ -1,5 +1,4 @@
 using System;
-using Unity.Mathematics;
 
 namespace Box3D
 {
@@ -38,12 +37,12 @@ namespace Box3D
         {
             for (int i = 0; i < bodies.Length; i++)
             {
-                // djb2 folds byte-by-byte, so chaining two calls equals one call over the
-                // concatenated bytes — single-precision hash values are unchanged by this split.
-                B3Pos position = bodies[i].Position;
-                quaternion rotation = bodies[i].Rotation;
-                hash = UnsafeBindings.b3Hash(hash, (byte*)&position, sizeof(B3Pos));
-                hash = UnsafeBindings.b3Hash(hash, (byte*)&rotation, 4 * sizeof(float));
+                // One GetTransform + one hash per body (instead of separate Position/Rotation
+                // fetches and two hash calls): B3WorldTransform is the position immediately
+                // followed by the float quaternion with no padding, and djb2 folds byte-by-byte,
+                // so this produces the exact same hash stream.
+                B3WorldTransform transform = bodies[i].GetTransform();
+                hash = UnsafeBindings.b3Hash(hash, (byte*)&transform, sizeof(B3WorldTransform));
             }
             return hash;
         }

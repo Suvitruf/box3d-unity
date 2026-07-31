@@ -95,11 +95,14 @@ namespace Box3D.Hybrid
             }
 
             float3 force = (float3)transform.forward * _currentStrength;
+            // Hoisted: InverseTransformPoint re-derives the matrix per call, and this loop runs
+            // per body per step.
+            Matrix4x4 worldToLocal = transform.worldToLocalMatrix;
             foreach (Body body in _bodies)
             {
                 if (body.GetBodyType() != BodyType.Dynamic) continue;
 
-                Vector3 local = transform.InverseTransformPoint((Vector3)body.Position);
+                Vector3 local = worldToLocal.MultiplyPoint3x4((Vector3)body.Position);
                 if (Mathf.Abs(local.x) > ZoneSize.x * 0.5f ||
                     Mathf.Abs(local.y) > ZoneSize.y * 0.5f ||
                     Mathf.Abs(local.z) > ZoneSize.z * 0.5f) continue;

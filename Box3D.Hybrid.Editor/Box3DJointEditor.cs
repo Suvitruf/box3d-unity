@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -8,10 +9,25 @@ namespace Box3D.Hybrid.Editor
     /// the anchor.</summary>
     public abstract class Box3DJointEditor : UnityEditor.Editor
     {
+        private readonly Dictionary<string, SerializedProperty> _properties =
+            new Dictionary<string, SerializedProperty>();
+
+        /// <summary>serializedObject.FindProperty with a per-editor cache — OnSceneGUI runs on
+        /// every scene-view event, and FindProperty re-walks the property path each call.</summary>
+        protected SerializedProperty Property(string name)
+        {
+            if (!_properties.TryGetValue(name, out SerializedProperty property))
+            {
+                property = serializedObject.FindProperty(name);
+                _properties[name] = property;
+            }
+            return property;
+        }
+
         /// <summary>Draws a draggable handle for a local-anchor property on a body's Transform.</summary>
         protected void DrawAnchorHandle(string anchorProperty, Transform body, Color color)
         {
-            SerializedProperty anchor = serializedObject.FindProperty(anchorProperty);
+            SerializedProperty anchor = Property(anchorProperty);
             Vector3 world = body.TransformPoint(anchor.vector3Value);
 
             Handles.color = color;
@@ -41,13 +57,13 @@ namespace Box3D.Hybrid.Editor
 
         protected void Field(string propertyName)
         {
-            EditorGUILayout.PropertyField(serializedObject.FindProperty(propertyName));
+            EditorGUILayout.PropertyField(Property(propertyName));
         }
 
         /// <summary>Draws a bool toggle and, only when it is on, its indented sub-fields.</summary>
         protected void ConditionalField(string toggle, params string[] subFields)
         {
-            SerializedProperty toggleProperty = serializedObject.FindProperty(toggle);
+            SerializedProperty toggleProperty = Property(toggle);
             EditorGUILayout.PropertyField(toggleProperty);
             if (!toggleProperty.boolValue) return;
 

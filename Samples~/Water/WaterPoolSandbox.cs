@@ -92,6 +92,7 @@ public class WaterPoolSandbox : MonoBehaviour
     private void OnDestroy()
     {
         if (Water) Water.BodyEntered -= OnBodyEntered;
+        if (_surfaceMesh) Destroy(_surfaceMesh); // runtime mesh — not freed with the GameObject
     }
 
     private void Update()
@@ -230,7 +231,7 @@ public class WaterPoolSandbox : MonoBehaviour
 
     private void OnBodyEntered(Body body, Vector3 point, float speed)
     {
-        if (!EnableSplashes || _droplets == null) return;
+        if (!EnableSplashes || !_droplets) return;
 
         // Each droplet gets an explicit up-and-out velocity (visual-only randomness — the physics
         // stays deterministic). Manual Emit + the shape module is unreliable, so we don't use it.

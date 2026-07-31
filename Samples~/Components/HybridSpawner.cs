@@ -25,6 +25,18 @@ public class HybridSpawner : MonoBehaviour
     private float Bounciness = 0.5f;
 
     private readonly List<GameObject> _spawned = new List<GameObject>();
+    private readonly List<Material> _materials = new List<Material>();
+    private GUIStyle _headerStyle; // created once inside OnGUI (GUI.skin is only valid there)
+
+    // Tints a fresh instance of BaseMaterial and tracks it: runtime-created materials are not
+    // scene objects, so destroying the GameObject alone would leak them.
+    private void ApplyTintedMaterial(GameObject visual)
+    {
+        if (!BaseMaterial) return;
+        var material = new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
+        visual.GetComponent<MeshRenderer>().material = material;
+        _materials.Add(material);
+    }
 
     private void Spawn(ShapeKind kind)
     {
@@ -48,11 +60,7 @@ public class HybridSpawner : MonoBehaviour
                 Random.Range(-3f, 3f), Random.Range(6f, 11f), Random.Range(-3f, 3f));
             visual.transform.rotation = Random.rotation;
 
-            if (BaseMaterial)
-            {
-                visual.GetComponent<MeshRenderer>().material =
-                    new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
-            }
+            ApplyTintedMaterial(visual);
 
             Box3DShape shape = AddShape(visual, kind);
             shape.SetRestitution(Bounciness); // set before the body bakes the shape on activation
@@ -98,11 +106,7 @@ public class HybridSpawner : MonoBehaviour
                 Destroy(ball.GetComponent<Collider>());
                 ball.transform.SetParent(root.transform, worldPositionStays: false);
                 ball.transform.localPosition = new Vector3(side * 0.6f, 0f, 0f);
-                if (BaseMaterial)
-                {
-                    ball.GetComponent<MeshRenderer>().material =
-                        new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
-                }
+                ApplyTintedMaterial(ball);
                 ball.AddComponent<Box3DSphereShape>().SetRestitution(Bounciness);
             }
 
@@ -133,11 +137,7 @@ public class HybridSpawner : MonoBehaviour
             link.transform.position = anchor + new Vector3((i + 0.5f) * length, 0f, 0f);
             link.transform.localScale = new Vector3(length, thickness, thickness);
 
-            if (BaseMaterial)
-            {
-                link.GetComponent<MeshRenderer>().material =
-                    new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
-            }
+            ApplyTintedMaterial(link);
 
             link.AddComponent<Box3DBoxShape>();
             Box3DBody body = link.AddComponent<Box3DBody>();
@@ -169,11 +169,7 @@ public class HybridSpawner : MonoBehaviour
             bob.SetActive(false);
             Destroy(bob.GetComponent<Collider>());
             bob.transform.position = top - new Vector3(0f, 3f, 0f); // hangs below, stretched
-            if (BaseMaterial)
-            {
-                bob.GetComponent<MeshRenderer>().material =
-                    new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
-            }
+            ApplyTintedMaterial(bob);
 
             bob.AddComponent<Box3DSphereShape>();
             bob.AddComponent<Box3DBody>();
@@ -215,11 +211,7 @@ public class HybridSpawner : MonoBehaviour
             Destroy(link.GetComponent<Collider>());
             link.transform.SetPositionAndRotation(cursor + forward * (length * 0.5f), dir);
             link.transform.localScale = new Vector3(length, thickness, thickness);
-            if (BaseMaterial)
-            {
-                link.GetComponent<MeshRenderer>().material =
-                    new Material(BaseMaterial) { color = Color.HSVToRGB(Random.value, 0.55f, 1f) };
-            }
+            ApplyTintedMaterial(link);
 
             link.AddComponent<Box3DBoxShape>();
             Box3DBody body = link.AddComponent<Box3DBody>();
@@ -247,12 +239,23 @@ public class HybridSpawner : MonoBehaviour
             if (go) Destroy(go); // Box3DBody.OnDisable destroys the native body
         }
         _spawned.Clear();
+        foreach (Material material in _materials)
+        {
+            if (material) Destroy(material);
+        }
+        _materials.Clear();
+    }
+
+    private void OnDestroy()
+    {
+        Clear();
     }
 
     private void OnGUI()
     {
         GUILayout.BeginArea(new Rect(10f, 10f, 220f, 400f), GUI.skin.box);
-        GUILayout.Label("<b>Component layer test</b>", new GUIStyle(GUI.skin.label) { richText = true });
+        _headerStyle ??= new GUIStyle(GUI.skin.label) { richText = true };
+        GUILayout.Label("<b>Component layer test</b>", _headerStyle);
 
         GUILayout.Label($"Count per press: {SpawnCount}");
         SpawnCount = (int)GUILayout.HorizontalSlider(SpawnCount, 1f, 30f);

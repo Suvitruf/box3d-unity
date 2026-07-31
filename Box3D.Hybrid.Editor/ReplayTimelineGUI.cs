@@ -7,6 +7,12 @@ namespace Box3D.Hybrid.Editor
     /// divergence read-out). See <see cref="IReplayTimeline"/>.</summary>
     internal static class ReplayTimelineGUI
     {
+        // Rebuilt only when the frame counter actually moves — Draw runs twice per repaint, and
+        // repaints are continuous during playback.
+        private static string _frameLabel;
+        private static int _labelFrame = -1;
+        private static int _labelLast = -1;
+
         public static void Draw(UnityEditor.Editor editor, IReplayTimeline replay)
         {
             if (!Application.isPlaying || !replay.IsCreated)
@@ -30,14 +36,22 @@ namespace Box3D.Hybrid.Editor
                 if (GUILayout.Button("Restart")) replay.Restart();
             }
 
-            EditorGUILayout.LabelField("Frame", $"{replay.Frame} / {last}");
+            if (_labelFrame != replay.Frame || _labelLast != last)
+            {
+                _labelFrame = replay.Frame;
+                _labelLast = last;
+                _frameLabel = $"{replay.Frame} / {last}";
+            }
+            EditorGUILayout.LabelField("Frame", _frameLabel);
 
             if (replay.HasDiverged)
                 EditorGUILayout.HelpBox($"Replay DIVERGED at frame {replay.DivergeFrame} — the sim is non-deterministic.", MessageType.Error);
             else
                 EditorGUILayout.HelpBox("Deterministic so far.", MessageType.None);
 
-            editor.Repaint(); // keep the read-out live during playback
+            // Repaint only while frames advance on their own; when paused the inspector already
+            // repaints on interaction, and an unconditional Repaint here is a busy loop.
+            if (replay.IsPlaying) editor.Repaint();
         }
     }
 }

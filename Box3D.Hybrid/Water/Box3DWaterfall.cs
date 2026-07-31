@@ -84,11 +84,12 @@ namespace Box3D.Hybrid
             count = Mathf.Min(count, MaxPerStep);
 
             float3 forward = transform.forward;
+            Matrix4x4 localToWorld = transform.localToWorldMatrix; // hoisted out of the per-particle loop
             for (int i = 0; i < count; i++)
             {
                 float2 lip = (_rng.NextFloat2() - 0.5f) * (float2)LipSize;
                 float3 velocity = forward * Speed + _rng.NextFloat3Direction() * (Speed * Spread);
-                float3 position = (float3)transform.TransformPoint(new Vector3(lip.x, lip.y, 0f));
+                float3 position = (float3)localToWorld.MultiplyPoint3x4(new Vector3(lip.x, lip.y, 0f));
 
                 // Scatter each particle along its first-step travel so consecutive steps join
                 // into a continuous sheet instead of pulsing in bands.
@@ -106,6 +107,12 @@ namespace Box3D.Hybrid
         // Matches the water volume color.
         private static readonly Color GizmoColor = new Color(0.35f, 0.75f, 0.95f, 0.9f);
 
+        // Cached scene search for the gravity preview: gizmos repaint continuously while
+        // selected, and a full scene scan per repaint adds up. Re-searched at most twice a
+        // second while no world exists.
+        private Box3DWorld _gizmoWorld;
+        private float _nextGizmoSearch;
+
         private void OnDrawGizmosSelected()
         {
             Gizmos.color = GizmoColor;
@@ -115,9 +122,12 @@ namespace Box3D.Hybrid
             // Ballistic preview of where the stream goes: the lip center and both width edges,
             // integrated with the scene's gravity (the same curve the particles will fly).
             Gizmos.matrix = Matrix4x4.identity;
-            Vector3 gravity = Physics.gravity;
-            var world = FindAnyObjectByType<Box3DWorld>();
-            if (world) gravity = world.GravityVector;
+            if (!_gizmoWorld && Time.realtimeSinceStartup >= _nextGizmoSearch)
+            {
+                _nextGizmoSearch = Time.realtimeSinceStartup + 0.5f;
+                _gizmoWorld = FindAnyObjectByType<Box3DWorld>();
+            }
+            Vector3 gravity = _gizmoWorld ? _gizmoWorld.GravityVector : Physics.gravity;
 
             for (int edge = -1; edge <= 1; edge++)
             {

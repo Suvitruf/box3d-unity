@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.8.1] — 2026-07-31
+
+Maintenance release: a full performance & lifetime audit of the wrapper, with every finding fixed.
+
+### Fixed — correctness & leaks
+- **Destroying a shape component individually now destroys its native shape** (and re-derives the
+  body's mass). Previously the collision stayed solid in the simulation — a ghost collider — and
+  mesh/terrain geometry leaked. Geometry release is idempotent, so any body/shape teardown order
+  is safe, and shapes now free their geometry even when the world was destroyed first.
+- **Custom friction/restitution mixers survive unrelated world destroys.** Destroying any world
+  used to clear the global mixing callbacks for all worlds, silently reverting live worlds to
+  engine-default mixing. Only the registering world's death clears them now.
+- `DynamicTree` gained a finalizer backstop — a leaked (undisposed) tree no longer leaks its
+  native node pool permanently. `Dispose` remains the correct path.
+- `Box3DWater` frees a destroyed terrain's GPU height grid immediately (previously it lingered
+  until a new terrain came into view); `Box3DStatsHud` no longer auto-respawns a physics world if
+  the world it was watching dies.
+- Samples clean up their runtime-created materials and meshes; the Playground checker texture now
+  actually shows on spawned objects (it was applied to a material instance that got replaced).
+- `Hull`/`TriangleMesh`/`HeightField`/`Compound`/`Recording`/`ReplayPlayer` docs now spell out the
+  copy rule: struct copies share one native pointer — `Destroy` exactly once, through one copy.
+
+### Changed — performance
+- **`Box3DWaterVolume` caches shape volumes** instead of running `ComputeMassData` (a full inertia
+  integral) per submerged shape per step — the biggest runtime win of the audit. Wave sampling in
+  the buoyancy loop also stops re-reading the transform per shape.
+- **`Determinism.HashState` halves its native calls** (one `GetTransform` + one hash per body);
+  the produced hash stream is bit-identical to before.
+- Water sim & renderer use pre-resolved shader property ids (no per-call string hashing) and only
+  touch the refraction keyword/blend state when it changes.
+- Debug draw builds AABB/box corners on the stack — zero GC with Bounds drawing enabled.
+- Replayers cap post-hitch catch-up (no unbounded native step bursts); the visual replayer resolves
+  body handles once at mapping time and reads one transform per body per frame; rope endpoints,
+  wind and waterfall loops each drop redundant per-iteration native/transform calls.
+- Editor tooling stops busy-looping: body-inspector contacts snapshot once per frame with the
+  scene-view pass gated to repaints, the collision debugger diagnoses on a 5 Hz throttle instead
+  of every IMGUI pass, the rope editor throttles mid-drag re-settling (~6 Hz, exact on release),
+  and inspectors/gizmos cache serialized properties, scene scans and reflection lookups.
+- Stats HUD builds its text once per frame; sample GUIs reuse their `GUIStyle`s.
+
+### Docs
+- Performance page: notes the one timing asymmetry in the PhysX comparison (PhysX's transform
+  write-back is inside its timed call; Box3D's move-event sync is outside).
+
 ## [0.8.0] — 2026-07-29
 
 ### Added — water

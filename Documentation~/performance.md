@@ -3,8 +3,11 @@
 All numbers from the *Benchmarks vs PhysX* sample scenes: identical seeded layouts simulated by
 Box3D and by Unity's built-in PhysX, timed around the step call only, 600 measured steps after
 warmup, editor on the same machine. Box3D ran its default **4 sub-steps per step** — arguably
-doing more solver work per step than PhysX's defaults — and still posts these numbers. Treat all
-figures as relative, not absolute; run the sample scenes on your own hardware.
+doing more solver work per step than PhysX's defaults — and still posts these numbers. One
+asymmetry to know: `Physics.Simulate` includes PhysX's transform write-back inside the timed call,
+while Box3D's move-event sync happens outside the stopwatch — this slightly inflates the PhysX
+numbers and isn't separable without under-measuring PhysX. Treat all figures as relative, not
+absolute; run the sample scenes on your own hardware.
 
 ## Results
 

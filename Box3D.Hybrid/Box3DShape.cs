@@ -95,13 +95,23 @@ namespace Box3D.Hybrid
 
         private void OnDestroy()
         {
-            // Only the self-created static body is ours to tear down; body-managed shapes are
-            // released by their Box3DBody after it destroys the body.
             if (_ownBody.IsValid)
             {
+                // Orphan shape: the self-created static body is ours (destroying it destroys the shape).
                 _ownBody.Destroy();
-                ReleaseGeometry();
             }
+            else if (_shape.IsValid)
+            {
+                // Body-managed shape destroyed individually (component removed, or its child
+                // GameObject destroyed while the body lives): remove the native shape so its
+                // collision doesn't linger, and re-derive the body's mass. During whole-body
+                // teardown the body's destroy already invalidated the id, so this no-ops there.
+                _shape.Destroy(updateBodyMass: true);
+            }
+            // Geometry (mesh/height-field) is user-owned memory independent of the world — free it
+            // even when the world was destroyed first. ReleaseGeometry is idempotent, so the owning
+            // Box3DBody's sweep may run before or after this in any teardown order.
+            ReleaseGeometry();
         }
 
         /// <summary>A shape definition seeded from this component's material fields and the

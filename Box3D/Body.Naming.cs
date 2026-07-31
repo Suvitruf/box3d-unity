@@ -11,9 +11,9 @@ namespace Box3D
         /// if you rely on that. box3d stores a short fixed-length name, so long names are truncated.</summary>
         public unsafe void SetName(string name)
         {
-            byte[] utf8 = Encoding.UTF8.GetBytes(name ?? "");
-            byte[] buf = new byte[utf8.Length + 1];
-            Array.Copy(utf8, buf, utf8.Length); // trailing 0 already present
+            name ??= "";
+            byte[] buf = new byte[Encoding.UTF8.GetByteCount(name) + 1];
+            Encoding.UTF8.GetBytes(name, 0, name.Length, buf, 0); // trailing 0 already present
             fixed (byte* p = buf)
             {
                 UnsafeBindings.b3Body_SetName(Id, (sbyte*)p);

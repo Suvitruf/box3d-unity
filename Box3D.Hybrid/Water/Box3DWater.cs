@@ -270,16 +270,16 @@ namespace Box3D.Hybrid
 
             foreach (int kernel in new[] { _kClearGrid, _kPredict, _kBuildGrid, _kLambda, _kDelta, _kApply, _kUpdateVel, _kFinalize })
             {
-                _compute.SetBuffer(kernel, "_Positions", _positions);
-                _compute.SetBuffer(kernel, "_Velocities", _velocities);
-                _compute.SetBuffer(kernel, "_Predicted", _predicted);
-                _compute.SetBuffer(kernel, "_Scratch", _scratch);
-                _compute.SetBuffer(kernel, "_Lambdas", _lambdas);
-                _compute.SetBuffer(kernel, "_Densities", _densities);
-                _compute.SetBuffer(kernel, "_GridHead", _gridHead);
-                _compute.SetBuffer(kernel, "_GridNext", _gridNext);
-                _compute.SetBuffer(kernel, "_Colliders", _colliders);
-                _compute.SetBuffer(kernel, "_BodyImpulses", _bodyImpulses);
+                _compute.SetBuffer(kernel, ShaderIds.Positions, _positions);
+                _compute.SetBuffer(kernel, ShaderIds.Velocities, _velocities);
+                _compute.SetBuffer(kernel, ShaderIds.Predicted, _predicted);
+                _compute.SetBuffer(kernel, ShaderIds.Scratch, _scratch);
+                _compute.SetBuffer(kernel, ShaderIds.Lambdas, _lambdas);
+                _compute.SetBuffer(kernel, ShaderIds.Densities, _densities);
+                _compute.SetBuffer(kernel, ShaderIds.GridHead, _gridHead);
+                _compute.SetBuffer(kernel, ShaderIds.GridNext, _gridNext);
+                _compute.SetBuffer(kernel, ShaderIds.Colliders, _colliders);
+                _compute.SetBuffer(kernel, ShaderIds.BodyImpulses, _bodyImpulses);
             }
         }
 
@@ -307,7 +307,7 @@ namespace Box3D.Hybrid
         {
             _terrainHeights?.Release();
             _terrainHeights = new ComputeBuffer(count, 4);
-            _compute.SetBuffer(_kApply, "_TerrainHeights", _terrainHeights);
+            _compute.SetBuffer(_kApply, ShaderIds.TerrainHeights, _terrainHeights);
         }
 
         // The first slot of this terrain's grid in the heights buffer, uploading it on first
@@ -315,18 +315,25 @@ namespace Box3D.Hybrid
         private int TerrainHeightsOffset(Box3DTerrainShape terrain)
         {
             if (_terrainSlots.TryGetValue(terrain, out int known)) return known;
+            RepackTerrainHeights(terrain);
+            return _terrainSlots[terrain];
+        }
 
+        // Rebuilds the packed heights buffer from the still-live tracked terrains (plus the one
+        // being added, if any), dropping destroyed terrains so their grids don't linger on the GPU.
+        private void RepackTerrainHeights(Box3DTerrainShape added)
+        {
             var terrains = new List<Box3DTerrainShape>();
             foreach (Box3DTerrainShape t in _terrainSlots.Keys)
             {
-                if (t && t.SampledHeights != null) terrains.Add(t); // drop destroyed terrains
+                if (t && t.SampledHeights != null) terrains.Add(t);
             }
-            terrains.Add(terrain);
+            if (added) terrains.Add(added);
             _terrainSlots.Clear();
 
             int total = 0;
             foreach (Box3DTerrainShape t in terrains) total += t.SampledHeights.Length;
-            BindTerrainHeights(total);
+            BindTerrainHeights(math.max(1, total)); // compute buffers can't be empty — keep a dummy slot
 
             int cursor = 0;
             foreach (Box3DTerrainShape t in terrains)
@@ -335,7 +342,19 @@ namespace Box3D.Hybrid
                 _terrainHeights.SetData(t.SampledHeights, 0, cursor, t.SampledHeights.Length);
                 cursor += t.SampledHeights.Length;
             }
-            return _terrainSlots[terrain];
+        }
+
+        // Cheap per-step sweep (the slot count is tiny): when a tracked terrain has died, repack
+        // right away so its grid — megabytes at full heightmap resolution — is reclaimed instead
+        // of waiting for a new terrain to come into view.
+        private void PruneDeadTerrains()
+        {
+            bool anyDead = false;
+            foreach (Box3DTerrainShape t in _terrainSlots.Keys)
+            {
+                if (!t || t.SampledHeights == null) { anyDead = true; break; }
+            }
+            if (anyDead) RepackTerrainHeights(null);
         }
 
         // ------------------------------------------------------------------ emission
@@ -451,6 +470,46 @@ namespace Box3D.Hybrid
             _windCount++;
         }
 
+        // Shader property ids resolved once: the string Set* overloads re-hash the name on
+        // every call, and these run per step / per camera per frame.
+        private static class ShaderIds
+        {
+            public static readonly int BodyImpulses = Shader.PropertyToID("_BodyImpulses");
+            public static readonly int BoundsMax = Shader.PropertyToID("_BoundsMax");
+            public static readonly int BoundsMin = Shader.PropertyToID("_BoundsMin");
+            public static readonly int CohesionK = Shader.PropertyToID("_CohesionK");
+            public static readonly int ColliderCount = Shader.PropertyToID("_ColliderCount");
+            public static readonly int Colliders = Shader.PropertyToID("_Colliders");
+            public static readonly int Contain = Shader.PropertyToID("_Contain");
+            public static readonly int CouplingScale = Shader.PropertyToID("_CouplingScale");
+            public static readonly int Damping = Shader.PropertyToID("_Damping");
+            public static readonly int DeltaTime = Shader.PropertyToID("_DeltaTime");
+            public static readonly int Densities = Shader.PropertyToID("_Densities");
+            public static readonly int FoamDecay = Shader.PropertyToID("_FoamDecay");
+            public static readonly int Gravity = Shader.PropertyToID("_Gravity");
+            public static readonly int GridHead = Shader.PropertyToID("_GridHead");
+            public static readonly int GridNext = Shader.PropertyToID("_GridNext");
+            public static readonly int InvDeltaTime = Shader.PropertyToID("_InvDeltaTime");
+            public static readonly int InvWDeltaQ = Shader.PropertyToID("_InvWDeltaQ");
+            public static readonly int Lambdas = Shader.PropertyToID("_Lambdas");
+            public static readonly int MaxSpeed = Shader.PropertyToID("_MaxSpeed");
+            public static readonly int ParticleCount = Shader.PropertyToID("_ParticleCount");
+            public static readonly int ParticleMass = Shader.PropertyToID("_ParticleMass");
+            public static readonly int ParticleRadius = Shader.PropertyToID("_ParticleRadius");
+            public static readonly int Poly6 = Shader.PropertyToID("_Poly6");
+            public static readonly int Positions = Shader.PropertyToID("_Positions");
+            public static readonly int Predicted = Shader.PropertyToID("_Predicted");
+            public static readonly int RestDensity = Shader.PropertyToID("_RestDensity");
+            public static readonly int Scratch = Shader.PropertyToID("_Scratch");
+            public static readonly int SmoothingRadius = Shader.PropertyToID("_SmoothingRadius");
+            public static readonly int SpikyGrad = Shader.PropertyToID("_SpikyGrad");
+            public static readonly int TerrainHeights = Shader.PropertyToID("_TerrainHeights");
+            public static readonly int Velocities = Shader.PropertyToID("_Velocities");
+            public static readonly int Viscosity = Shader.PropertyToID("_Viscosity");
+            public static readonly int WindCount = Shader.PropertyToID("_WindCount");
+            public static readonly int WindData = Shader.PropertyToID("_WindData");
+        }
+
         // ------------------------------------------------------------------ stepping
 
         private void FixedUpdate()
@@ -469,30 +528,30 @@ namespace Box3D.Hybrid
             float deltaQ = 0.3f * h;
             float wDeltaQ = poly6 * Mathf.Pow(h2 - deltaQ * deltaQ, 3f);
 
-            _compute.SetInt("_ParticleCount", _activeRange);
-            _compute.SetInt("_ColliderCount", _colliderCount);
-            _compute.SetFloat("_DeltaTime", dt);
-            _compute.SetFloat("_InvDeltaTime", 1f / dt);
-            _compute.SetVector("_Gravity", (Vector3)_world.GravityVector * GravityScale);
-            _compute.SetFloat("_ParticleRadius", ParticleRadius);
-            _compute.SetFloat("_SmoothingRadius", h);
-            _compute.SetFloat("_RestDensity", RestDensity);
-            _compute.SetFloat("_ParticleMass", ParticleMass);
-            _compute.SetFloat("_Poly6", poly6);
-            _compute.SetFloat("_SpikyGrad", -45f / (Mathf.PI * Mathf.Pow(h, 6f)));
-            _compute.SetFloat("_CohesionK", Cohesion);
-            _compute.SetFloat("_InvWDeltaQ", 1f / wDeltaQ);
-            _compute.SetFloat("_Viscosity", Viscosity);
-            _compute.SetFloat("_Damping", Mathf.Exp(-Damping * dt));
+            _compute.SetInt(ShaderIds.ParticleCount, _activeRange);
+            _compute.SetInt(ShaderIds.ColliderCount, _colliderCount);
+            _compute.SetFloat(ShaderIds.DeltaTime, dt);
+            _compute.SetFloat(ShaderIds.InvDeltaTime, 1f / dt);
+            _compute.SetVector(ShaderIds.Gravity, (Vector3)_world.GravityVector * GravityScale);
+            _compute.SetFloat(ShaderIds.ParticleRadius, ParticleRadius);
+            _compute.SetFloat(ShaderIds.SmoothingRadius, h);
+            _compute.SetFloat(ShaderIds.RestDensity, RestDensity);
+            _compute.SetFloat(ShaderIds.ParticleMass, ParticleMass);
+            _compute.SetFloat(ShaderIds.Poly6, poly6);
+            _compute.SetFloat(ShaderIds.SpikyGrad, -45f / (Mathf.PI * Mathf.Pow(h, 6f)));
+            _compute.SetFloat(ShaderIds.CohesionK, Cohesion);
+            _compute.SetFloat(ShaderIds.InvWDeltaQ, 1f / wDeltaQ);
+            _compute.SetFloat(ShaderIds.Viscosity, Viscosity);
+            _compute.SetFloat(ShaderIds.Damping, Mathf.Exp(-Damping * dt));
             Vector3 boundsCenter = transform.position;
-            _compute.SetVector("_BoundsMin", boundsCenter - BoundsSize * 0.5f);
-            _compute.SetVector("_BoundsMax", boundsCenter + BoundsSize * 0.5f);
-            _compute.SetInt("_Contain", Contain ? 1 : 0);
-            _compute.SetFloat("_CouplingScale", TwoWayCoupling ? CouplingStrength : 0f);
-            _compute.SetFloat("_MaxSpeed", h / dt);
-            _compute.SetFloat("_FoamDecay", Mathf.Exp(-1.1f * dt));
-            _compute.SetInt("_WindCount", _windCount);
-            if (_windCount > 0) _compute.SetVectorArray("_WindData", _windData);
+            _compute.SetVector(ShaderIds.BoundsMin, boundsCenter - BoundsSize * 0.5f);
+            _compute.SetVector(ShaderIds.BoundsMax, boundsCenter + BoundsSize * 0.5f);
+            _compute.SetInt(ShaderIds.Contain, Contain ? 1 : 0);
+            _compute.SetFloat(ShaderIds.CouplingScale, TwoWayCoupling ? CouplingStrength : 0f);
+            _compute.SetFloat(ShaderIds.MaxSpeed, h / dt);
+            _compute.SetFloat(ShaderIds.FoamDecay, Mathf.Exp(-1.1f * dt));
+            _compute.SetInt(ShaderIds.WindCount, _windCount);
+            if (_windCount > 0) _compute.SetVectorArray(ShaderIds.WindData, _windData);
             _windCount = 0; // consumed — a wind that stopped blowing must not linger
 
             _bodyImpulses.SetData(_impulseClear);
@@ -522,6 +581,8 @@ namespace Box3D.Hybrid
 
         private void GatherColliders()
         {
+            PruneDeadTerrains();
+
             var filter = QueryFilter.Default;
             filter.CategoryBits = 1UL << gameObject.layer;
             ulong mask = 0;

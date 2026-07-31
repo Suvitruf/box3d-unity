@@ -82,6 +82,13 @@ namespace Box3D.Hybrid
         private HashSet<Body> _submerged = new HashSet<Body>();
         private HashSet<Body> _submergedPrevious = new HashSet<Body>();
 
+        // Shape volume cache: ComputeMassData is a full inertia integral (expensive for hulls) and
+        // a shape's geometric volume never changes (deformable rebuilds create a NEW shape id, and
+        // density edits don't move mass/density). Swapped each step like the submersion sets, so
+        // entries for shapes that left the water fall out on their own.
+        private Dictionary<ShapeId, float> _volumes = new Dictionary<ShapeId, float>();
+        private Dictionary<ShapeId, float> _volumesPrevious = new Dictionary<ShapeId, float>();
+
         /// <summary>How much of the zone holds water (0 = empty, 1 = full). Setting it moves the
         /// surface; bodies in the zone wake automatically on the next step.</summary>
         public float FillLevel
@@ -114,6 +121,14 @@ namespace Box3D.Hybrid
             float surface = SurfaceY;
             if (!EnableWaves || WaveAmplitude <= 0f) return surface;
 
+            float halfY = ZoneSize.y * 0.5f * Mathf.Abs(transform.lossyScale.y);
+            return SampleWaveY(x, z, surface, transform.position.y, halfY);
+        }
+
+        // The wave math with the transform-derived frame passed in, so the per-shape loop in
+        // FixedUpdate samples without re-reading transform.position/lossyScale each call.
+        private float SampleWaveY(float x, float z, float surface, float centerY, float halfY)
+        {
             float t = Time.time * WaveSpeed;
             float k = 2f * math.PI / WaveLength;
             // Three fixed-direction components at related frequencies — cheap, loopless, and
@@ -124,8 +139,7 @@ namespace Box3D.Hybrid
             surface += wave * WaveAmplitude;
 
             // Never above the zone or below its floor.
-            float halfY = ZoneSize.y * 0.5f * Mathf.Abs(transform.lossyScale.y);
-            return Mathf.Clamp(surface, transform.position.y - halfY, transform.position.y + halfY);
+            return Mathf.Clamp(surface, centerY - halfY, centerY + halfY);
         }
 
         private void Awake()
@@ -182,7 +196,9 @@ namespace Box3D.Hybrid
                 // the surface sampled at the shape's own (x, z) so waves lift and drop it locally.
                 B3Aabb bounds = shape.GetAABB();
                 float3 boundsCenter = (bounds.LowerBound + bounds.UpperBound) * 0.5f;
-                float localSurface = waves ? SampleSurfaceY(boundsCenter.x, boundsCenter.z) : surfaceY;
+                float localSurface = waves
+                    ? SampleWaveY(boundsCenter.x, boundsCenter.z, surfaceY, center.y, half.y)
+                    : surfaceY;
 
                 float3 lo = math.max(bounds.LowerBound, water.LowerBound);
                 float3 hi = math.min(bounds.UpperBound, new float3(water.UpperBound.x, localSurface, water.UpperBound.z));
@@ -196,9 +212,14 @@ namespace Box3D.Hybrid
 
                 // True shape volume from its own mass data, so a sphere doesn't displace like its
                 // bounding box; the AABB only supplies the submerged fraction.
-                float shapeDensity = shape.GetDensity();
-                if (shapeDensity <= 0f) continue;
-                float displaced = shape.ComputeMassData().Mass / shapeDensity * fraction;
+                if (!_volumesPrevious.TryGetValue(_overlap[i], out float volume))
+                {
+                    float shapeDensity = shape.GetDensity();
+                    if (shapeDensity <= 0f) continue;
+                    volume = shape.ComputeMassData().Mass / shapeDensity;
+                }
+                _volumes[_overlap[i]] = volume;
+                float displaced = volume * fraction;
                 if (displaced <= 0f) continue;
 
                 float3 centerOfBuoyancy = (lo + hi) * 0.5f;
@@ -227,6 +248,8 @@ namespace Box3D.Hybrid
             }
             (_submerged, _submergedPrevious) = (_submergedPrevious, _submerged);
             _submerged.Clear();
+            (_volumes, _volumesPrevious) = (_volumesPrevious, _volumes);
+            _volumes.Clear();
         }
 
         private void OnBodyEntered(Body body, float3 point)
@@ -267,6 +290,8 @@ namespace Box3D.Hybrid
             foreach (Body body in _submergedPrevious) InvokeExited(body);
             _submergedPrevious.Clear();
             _submerged.Clear();
+            _volumesPrevious.Clear();
+            _volumes.Clear();
         }
 
         private void OnDisable()

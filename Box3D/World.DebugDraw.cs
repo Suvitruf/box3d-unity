@@ -390,7 +390,9 @@ namespace Box3D
             try
             {
                 DrawCallCount++;
-                DrawEdges(Corners(aabb), ToColor(color));
+                Span<float3> corners = stackalloc float3[8];
+                Corners(aabb, corners);
+                DrawEdges(corners, ToColor(color));
             }
             catch (Exception exception)
             {
@@ -405,7 +407,7 @@ namespace Box3D
             {
                 DrawCallCount++;
                 B3Transform transform = worldTransform.ToB3Transform();
-                var corners = new float3[8];
+                Span<float3> corners = stackalloc float3[8];
                 for (int i = 0; i < 8; i++)
                 {
                     float3 local = new float3(
@@ -422,9 +424,8 @@ namespace Box3D
             }
         }
 
-        private static float3[] Corners(B3Aabb aabb)
+        private static void Corners(B3Aabb aabb, Span<float3> corners)
         {
-            var corners = new float3[8];
             for (int i = 0; i < 8; i++)
             {
                 corners[i] = new float3(
@@ -432,10 +433,9 @@ namespace Box3D
                     (i & 2) == 0 ? aabb.LowerBound.y : aabb.UpperBound.y,
                     (i & 4) == 0 ? aabb.LowerBound.z : aabb.UpperBound.z);
             }
-            return corners;
         }
 
-        private static void DrawEdges(float3[] corners, Color color)
+        private static void DrawEdges(ReadOnlySpan<float3> corners, Color color)
         {
             // Connect corners differing in exactly one bit (12 box edges).
             for (int i = 0; i < 8; i++)

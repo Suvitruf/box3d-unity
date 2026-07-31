@@ -93,6 +93,7 @@ namespace Box3D.Hybrid
         internal override void ReleaseGeometry()
         {
             if (_mesh.IsCreated) _mesh.Destroy();
+            _mesh = default; // idempotent: both the shape and its Box3DBody may call this
         }
 
 #if UNITY_EDITOR

@@ -272,7 +272,9 @@ namespace Box3D.Hybrid
 
         private static Vector3 SegmentTip(Body body, float alongZ)
         {
-            return (Vector3)((float3)body.Position + math.mul(body.Rotation, new float3(0f, 0f, alongZ)));
+            // One GetTransform instead of separate Position + Rotation natives (runs per segment per frame).
+            B3Transform tf = body.GetTransform().ToB3Transform();
+            return (Vector3)(tf.Position + math.mul(tf.Rotation, new float3(0f, 0f, alongZ)));
         }
 
         private void OnDestroy()

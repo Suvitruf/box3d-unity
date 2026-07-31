@@ -145,5 +145,6 @@ public class Box3DJointsSandbox : MonoBehaviour
     private void OnDestroy()
     {
         if (_world.IsValid) _world.Destroy();
+        RopeLine.Destroy(_rope);
     }
 }

@@ -22,7 +22,7 @@ namespace Box3D.Hybrid.Editor
 
             // The connected anchor: on the connected body if any, otherwise a world point.
             var joint = (Box3DDistanceJoint)target;
-            SerializedProperty connected = serializedObject.FindProperty("ConnectedBody");
+            SerializedProperty connected = Property("ConnectedBody");
             var connectedBody = connected.objectReferenceValue as Box3DBody;
             if (connectedBody)
             {
@@ -30,7 +30,7 @@ namespace Box3D.Hybrid.Editor
             }
             else
             {
-                SerializedProperty anchor = serializedObject.FindProperty("ConnectedAnchor");
+                SerializedProperty anchor = Property("ConnectedAnchor");
                 EditorGUI.BeginChangeCheck();
                 Handles.color = new Color(1f, 0.6f, 0.2f);
                 float size = HandleUtility.GetHandleSize(anchor.vector3Value) * 0.12f;
