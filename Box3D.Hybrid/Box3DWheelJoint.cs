@@ -1,3 +1,4 @@
+
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -109,7 +110,7 @@ namespace Box3D.Hybrid
             def.LowerSteeringLimit = -math.radians(MaxSteerAngle);
             def.UpperSteeringLimit = math.radians(MaxSteerAngle);
 
-            _wheel = World.World.CreateWheelJoint(def);
+            _wheel = IBox3DWorld.Get(this).PhysicsWorld.CreateWheelJoint(def);
             return _wheel;
         }
 

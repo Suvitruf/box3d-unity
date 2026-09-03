@@ -42,7 +42,9 @@ namespace Box3D.Hybrid
             def.Radius = Radius;
             def.Falloff = Falloff;
             def.ImpulsePerArea = ImpulsePerArea;
-            Box3DWorld.Instance.World.Explode(def);
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
+            world.PhysicsWorld.Explode(def);
         }
 
         // Matches the Forces category icon color.

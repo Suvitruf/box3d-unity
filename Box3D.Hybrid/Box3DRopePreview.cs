@@ -27,7 +27,7 @@ namespace Box3D.Hybrid
             _nodes = new Vector3[rope.SegmentCount + 1];
 
             WorldDef worldDef = WorldDef.Default;
-            worldDef.Gravity = rope.SceneGravity();
+            worldDef.Gravity = IBox3DWorld.GetSceneGravity(rope);
             _world = World.Create(worldDef);
 
             ReplicateScene();

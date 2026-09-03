@@ -1,3 +1,4 @@
+
 using UnityEngine;
 
 namespace Box3D.Hybrid
@@ -47,7 +48,7 @@ namespace Box3D.Hybrid
                 def.UpperTwistAngle = Mathf.Max(MinTwist, MaxTwist) * Mathf.Deg2Rad;
             }
 
-            _ball = World.World.CreateSphericalJoint(def);
+            _ball = IBox3DWorld.Get(this).PhysicsWorld.CreateSphericalJoint(def);
             return _ball;
         }
 

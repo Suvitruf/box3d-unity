@@ -29,7 +29,7 @@ namespace Box3D.Hybrid
         [SerializeField, Range(10, 28)]
         private int FontSize = 14;
 
-        private Box3DWorld _world;
+        private IBox3DWorld _world;
         private bool _worldSearched;
         private Profile _profile;
         private Counters _counters;
@@ -47,18 +47,17 @@ namespace Box3D.Hybrid
             // One-shot acquisition: Box3DWorld.Instance scene-searches and AUTO-CREATES a world
             // when none exists — retrying every frame would make a diagnostics overlay respawn
             // physics after the world it was watching died.
-            if (!_world)
+            if (_world == null)
             {
                 if (_worldSearched) return;
                 _worldSearched = true;
-                _world = Box3DWorld.Instance;
+                _world = IBox3DWorld.Get(this);
             }
-            World world = _world ? _world.World : default;
-            if (!world.IsValid) return;
+            if (!IBox3DWorld.Validate(_world)) return;
 
-            _profile = world.GetProfile();
-            _counters = world.GetCounters();
-            _awakeBodies = world.GetAwakeBodyCount();
+            _profile = _world.PhysicsWorld.GetProfile();
+            _counters = _world.PhysicsWorld.GetCounters();
+            _awakeBodies = _world.PhysicsWorld.GetAwakeBodyCount();
 
             // Smooth the noisy per-step values so they're readable.
             _stepMs = Mathf.Lerp(_stepMs, _profile.Step, 0.1f);
@@ -72,7 +71,7 @@ namespace Box3D.Hybrid
 
         private void OnGUI()
         {
-            if (!Visible || !_world || string.IsNullOrEmpty(_content.text)) return;
+            if (!Visible || _world == null || string.IsNullOrEmpty(_content.text)) return;
 
             EnsureStyle();
             Vector2 size = _style.CalcSize(_content);

@@ -114,7 +114,6 @@ namespace Box3D.Hybrid
         private const float ImpulseScale = 256f;   // fixed-point scale used by the compute kernels
         private const float RestDensity = 1000f;
 
-        private Box3DWorld _world;
         private ComputeShader _compute;
         private Box3DWaterRenderer _renderer;
 
@@ -208,7 +207,6 @@ namespace Box3D.Hybrid
                 return;
             }
 
-            _world = Box3DWorld.Instance;
             ComputeShader source = Resources.Load<ComputeShader>("Box3D/Box3DWaterSim");
             if (!source)
             {
@@ -372,16 +370,16 @@ namespace Box3D.Hybrid
 
             int n = 0;
             for (int x = 0; x < counts.x && n < _capacity; x++)
-            for (int y = 0; y < counts.y && n < _capacity; y++)
-            for (int z = 0; z < counts.z && n < _capacity; z++)
-            {
-                float3 local = -half + spacing * 0.5f + new float3(x, y, z) * spacing
-                               + rng.NextFloat3(-0.02f, 0.02f) * spacing;
-                float3 world = transform.TransformPoint((Vector3)local);
-                _spawnPositions[n] = new float4(world, 1f);
-                _spawnVelocities[n] = float4.zero;
-                n++;
-            }
+                for (int y = 0; y < counts.y && n < _capacity; y++)
+                    for (int z = 0; z < counts.z && n < _capacity; z++)
+                    {
+                        float3 local = -half + spacing * 0.5f + new float3(x, y, z) * spacing
+                                       + rng.NextFloat3(-0.02f, 0.02f) * spacing;
+                        float3 world = transform.TransformPoint((Vector3)local);
+                        _spawnPositions[n] = new float4(world, 1f);
+                        _spawnVelocities[n] = float4.zero;
+                        n++;
+                    }
 
             _positions.SetData(_spawnPositions, 0, 0, n);
             _velocities.SetData(_spawnVelocities, 0, 0, n);
@@ -514,12 +512,14 @@ namespace Box3D.Hybrid
 
         private void FixedUpdate()
         {
-            if (_positions == null || !_world || _world.Paused || !_world.World.IsValid) return;
+            if (_positions == null) return;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world) || world.IsPaused) return;
 
             ApplyFinishedReadbacks();
             if (_activeRange == 0) return;
 
-            GatherColliders();
+            GatherColliders(world);
 
             float dt = Time.fixedDeltaTime / Substeps;
             float h = SmoothingRadius;
@@ -532,7 +532,7 @@ namespace Box3D.Hybrid
             _compute.SetInt(ShaderIds.ColliderCount, _colliderCount);
             _compute.SetFloat(ShaderIds.DeltaTime, dt);
             _compute.SetFloat(ShaderIds.InvDeltaTime, 1f / dt);
-            _compute.SetVector(ShaderIds.Gravity, (Vector3)_world.GravityVector * GravityScale);
+            _compute.SetVector(ShaderIds.Gravity, world.Gravity * GravityScale);
             _compute.SetFloat(ShaderIds.ParticleRadius, ParticleRadius);
             _compute.SetFloat(ShaderIds.SmoothingRadius, h);
             _compute.SetFloat(ShaderIds.RestDensity, RestDensity);
@@ -579,7 +579,7 @@ namespace Box3D.Hybrid
             if (TwoWayCoupling && _bodyCount > 0) RequestReadback();
         }
 
-        private void GatherColliders()
+        private void GatherColliders(IBox3DWorld world)
         {
             PruneDeadTerrains();
 
@@ -600,7 +600,7 @@ namespace Box3D.Hybrid
                 UpperBound = center + (float3)(BoundsSize * 0.5f) + margin,
             };
 
-            int shapeCount = _world.World.OverlapAABB(aabb, filter, _overlap);
+            int shapeCount = world.PhysicsWorld.OverlapAABB(aabb, filter, _overlap);
             _colliderCount = 0;
             _bodyCount = 0;
             _bodySlots.Clear();
@@ -616,58 +616,58 @@ namespace Box3D.Hybrid
                 switch (shape.GetShapeType())
                 {
                     case ShapeType.Sphere:
-                    {
-                        Sphere s = shape.GetSphere();
-                        col.Type = 0;
-                        col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, s.Center), 0f);
-                        col.Data = new float4(s.Radius, 0f, 0f, 0f);
-                        break;
-                    }
+                        {
+                            Sphere s = shape.GetSphere();
+                            col.Type = 0;
+                            col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, s.Center), 0f);
+                            col.Data = new float4(s.Radius, 0f, 0f, 0f);
+                            break;
+                        }
                     case ShapeType.Capsule:
-                    {
-                        Capsule c = shape.GetCapsule();
-                        col.Type = 1;
-                        col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, c.Center1), 0f);
-                        col.Data = new float4(tf.Position + math.rotate(tf.Rotation, c.Center2), c.Radius);
-                        break;
-                    }
+                        {
+                            Capsule c = shape.GetCapsule();
+                            col.Type = 1;
+                            col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, c.Center1), 0f);
+                            col.Data = new float4(tf.Position + math.rotate(tf.Rotation, c.Center2), c.Radius);
+                            break;
+                        }
                     case ShapeType.Hull:
-                    {
-                        B3Aabb local = shape.GetHullLocalBounds();
-                        float3 mid = (local.LowerBound + local.UpperBound) * 0.5f;
-                        col.Type = 2;
-                        col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, mid), 0f);
-                        col.Data = new float4((local.UpperBound - local.LowerBound) * 0.5f, 0f);
-                        break;
-                    }
+                        {
+                            B3Aabb local = shape.GetHullLocalBounds();
+                            float3 mid = (local.LowerBound + local.UpperBound) * 0.5f;
+                            col.Type = 2;
+                            col.Pos = new float4(tf.Position + math.rotate(tf.Rotation, mid), 0f);
+                            col.Data = new float4((local.UpperBound - local.LowerBound) * 0.5f, 0f);
+                            break;
+                        }
                     case ShapeType.HeightField:
-                    {
-                        // Terrain collides exactly: the component's sampled grid rides on the GPU
-                        // and is bilinearly sampled per particle. Fields with no live
-                        // Box3DTerrainShape (created straight through the API) have no grid to
-                        // sample and keep the bounding-box treatment below.
-                        if (!Box3DTerrainShape.TryGetLiveField(_overlap[i], out Box3DTerrainShape terrain)) goto default;
-                        float3 fieldScale = terrain.FieldScale;
-                        col.Type = 3;
-                        col.Rot = new float4(0f, 0f, 0f, 1f);
-                        col.Pos = new float4(terrain.FieldOrigin, 0f);
-                        col.Data = new float4(fieldScale, terrain.SampleCountZ);
-                        col.Aux0 = TerrainHeightsOffset(terrain);
-                        col.Aux1 = terrain.SampleCountX;
-                        break;
-                    }
+                        {
+                            // Terrain collides exactly: the component's sampled grid rides on the GPU
+                            // and is bilinearly sampled per particle. Fields with no live
+                            // Box3DTerrainShape (created straight through the API) have no grid to
+                            // sample and keep the bounding-box treatment below.
+                            if (!Box3DTerrainShape.TryGetLiveField(_overlap[i], out Box3DTerrainShape terrain)) goto default;
+                            float3 fieldScale = terrain.FieldScale;
+                            col.Type = 3;
+                            col.Rot = new float4(0f, 0f, 0f, 1f);
+                            col.Pos = new float4(terrain.FieldOrigin, 0f);
+                            col.Data = new float4(fieldScale, terrain.SampleCountZ);
+                            col.Aux0 = TerrainHeightsOffset(terrain);
+                            col.Aux1 = terrain.SampleCountX;
+                            break;
+                        }
                     default:
-                    {
-                        if (!ApproximateComplexShapes) continue;
-                        B3Aabb world = shape.GetAABB();
-                        col.Type = 2;
-                        col.Rot = new float4(0f, 0f, 0f, 1f);
-                        col.Pos = new float4((world.LowerBound + world.UpperBound) * 0.5f, 0f);
-                        // w = 1: a world-AABB approximation — only its top face acts on the
-                        // water (see the box branch in Box3DWaterSim.compute).
-                        col.Data = new float4((world.UpperBound - world.LowerBound) * 0.5f, 1f);
-                        break;
-                    }
+                        {
+                            if (!ApproximateComplexShapes) continue;
+                            B3Aabb bworld = shape.GetAABB();
+                            col.Type = 2;
+                            col.Rot = new float4(0f, 0f, 0f, 1f);
+                            col.Pos = new float4((bworld.LowerBound + bworld.UpperBound) * 0.5f, 0f);
+                            // w = 1: a world-AABB approximation — only its top face acts on the
+                            // water (see the box branch in Box3DWaterSim.compute).
+                            col.Data = new float4((bworld.UpperBound - bworld.LowerBound) * 0.5f, 1f);
+                            break;
+                        }
                 }
 
                 col.BodyIndex = -1;

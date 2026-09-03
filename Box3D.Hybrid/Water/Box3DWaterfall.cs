@@ -110,7 +110,7 @@ namespace Box3D.Hybrid
         // Cached scene search for the gravity preview: gizmos repaint continuously while
         // selected, and a full scene scan per repaint adds up. Re-searched at most twice a
         // second while no world exists.
-        private Box3DWorld _gizmoWorld;
+        private Vector3? _gizmoGravity = null;
         private float _nextGizmoSearch;
 
         private void OnDrawGizmosSelected()
@@ -122,12 +122,12 @@ namespace Box3D.Hybrid
             // Ballistic preview of where the stream goes: the lip center and both width edges,
             // integrated with the scene's gravity (the same curve the particles will fly).
             Gizmos.matrix = Matrix4x4.identity;
-            if (!_gizmoWorld && Time.realtimeSinceStartup >= _nextGizmoSearch)
+            if (_gizmoGravity == null && Time.realtimeSinceStartup >= _nextGizmoSearch)
             {
                 _nextGizmoSearch = Time.realtimeSinceStartup + 0.5f;
-                _gizmoWorld = FindAnyObjectByType<Box3DWorld>();
+                _gizmoGravity = IBox3DWorld.GetSceneGravityOrDefault(this, null);
             }
-            Vector3 gravity = _gizmoWorld ? _gizmoWorld.GravityVector : Physics.gravity;
+            Vector3 gravity = _gizmoGravity == null ? Physics.gravity : _gizmoGravity.Value;
 
             for (int edge = -1; edge <= 1; edge++)
             {

@@ -43,7 +43,7 @@ namespace Box3D.Hybrid
             def.AngularDampingRatio = AngularDampingRatio;
             def.MaxSpringTorque = MaxTorque;
 
-            _motor = World.World.CreateMotorJoint(def);
+            _motor = IBox3DWorld.Get(this).PhysicsWorld.CreateMotorJoint(def);
             return _motor;
         }
 

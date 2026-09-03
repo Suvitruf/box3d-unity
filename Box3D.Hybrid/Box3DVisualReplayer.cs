@@ -32,7 +32,6 @@ namespace Box3D.Hybrid
         private const int MaxCatchUpSteps = 8;
 
         private ReplayPlayer _player;
-        private Box3DWorld _world;
         private Transform[] _targets; // replay body index -> scene transform (null = unmapped / hole)
         private Body[] _replayBodies; // replay body handles, resolved once at mapping time
         private bool _isPlaying;
@@ -50,12 +49,11 @@ namespace Box3D.Hybrid
         private void Start()
         {
             if (string.IsNullOrEmpty(LoadPath)) return;
-
             // Pause live physics right away so the scene doesn't simulate before the replay takes over,
             // then defer the load one frame: objects built in other components' Start() (like a spawned
             // car) don't exist yet here, but they will by the first Update.
-            _world = Box3DWorld.Instance;
-            if (_world) _world.Paused = true;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (IBox3DWorld.Validate(world)) world.IsPaused = true;
             _pendingLoad = true;
         }
 
@@ -93,8 +91,8 @@ namespace Box3D.Hybrid
         private void BuildMapping()
         {
             // Pause live physics so it doesn't fight the replayed transforms.
-            _world = Box3DWorld.Instance;
-            if (_world) _world.Paused = true;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
 
             // Group scene objects by their (recorded) body name — read from the live body so it matches
             // the recording's truncation exactly.
@@ -222,7 +220,8 @@ namespace Box3D.Hybrid
         private void Unload()
         {
             if (_player.IsCreated) _player.Destroy();
-            if (_world) _world.Paused = false;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (IBox3DWorld.Validate(world)) world.IsPaused = false;
             _isPlaying = false;
             _targets = null;
         }

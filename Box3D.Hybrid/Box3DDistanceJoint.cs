@@ -69,7 +69,7 @@ namespace Box3D.Hybrid
                 def.DampingRatio = DampingRatio;
             }
 
-            _distance = World.World.CreateDistanceJoint(def);
+            _distance = IBox3DWorld.Get(this).PhysicsWorld.CreateDistanceJoint(def);
             return _distance;
         }
 

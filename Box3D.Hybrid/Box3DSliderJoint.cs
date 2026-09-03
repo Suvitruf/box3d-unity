@@ -51,7 +51,7 @@ namespace Box3D.Hybrid
                 def.MaxMotorForce = MaxMotorForce;
             }
 
-            _slider = World.World.CreatePrismaticJoint(def);
+            _slider = IBox3DWorld.Get(this).PhysicsWorld.CreatePrismaticJoint(def);
             return _slider;
         }
 

@@ -39,7 +39,6 @@ namespace Box3D.Hybrid
         [SerializeField, Tooltip("Allow fast rotation (e.g. spinning wheels) without box3d clamping angular velocity.")]
         private bool AllowFastRotation;
 
-        private Box3DWorld _world;
         private Body _body;
         private Box3DShape[] _shapes;
         private IBox3DHitReceiver[] _hitReceivers;
@@ -64,8 +63,10 @@ namespace Box3D.Hybrid
 
                 _body.SetType(ToNative(value));
                 bool isKinematic = value == Box3DBodyType.Kinematic;
-                if (isKinematic && !wasKinematic) _world.AddKinematic(this);
-                else if (!isKinematic && wasKinematic) _world.RemoveKinematic(this);
+                IBox3DWorld world = IBox3DWorld.Get(this);
+                if (!IBox3DWorld.Validate(world)) return;
+                if (isKinematic && !wasKinematic) world.AddBody(this);
+                else if (!isKinematic && wasKinematic) world.RemoveBody(this);
             }
         }
 
@@ -97,7 +98,9 @@ namespace Box3D.Hybrid
 
         private void Awake()
         {
-            _world = Box3DWorld.Instance;
+
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
 
             BodyDef def = BodyDef.Default;
             def.Type = ToNative(Type);
@@ -111,7 +114,7 @@ namespace Box3D.Hybrid
 
             _handle = GCHandle.Alloc(this);
             def.UserData = GCHandle.ToIntPtr(_handle);
-            _body = _world.World.CreateBody(def);
+            _body = world.PhysicsWorld.CreateBody(def);
             _body.SetName(gameObject.name); // recorded — lets the visual replayer map replay bodies to scene objects
 
             var shapes = new System.Collections.Generic.List<Box3DShape>();
@@ -133,7 +136,7 @@ namespace Box3D.Hybrid
                     ownerData, _hitReceivers.Length > 0);
             }
 
-            if (Type == Box3DBodyType.Kinematic) _world.AddKinematic(this);
+            if (Type == Box3DBodyType.Kinematic) world.AddBody(this);
             transform.hasChanged = false;
         }
 
@@ -152,7 +155,12 @@ namespace Box3D.Hybrid
 
         private void OnDestroy()
         {
-            if (Type == Box3DBodyType.Kinematic && _world) _world.RemoveKinematic(this);
+            if (Type == Box3DBodyType.Kinematic)
+            {
+                IBox3DWorld world = IBox3DWorld.Get(this);
+                if (IBox3DWorld.Validate(world))
+                    world.RemoveBody(this);
+            }
             if (_body.IsValid) _body.Destroy();
             // Free referenced geometry (meshes) only after the body — and its shapes — are gone.
             if (_shapes != null)
@@ -269,8 +277,10 @@ namespace Box3D.Hybrid
             _body.SetType(ToNative(Type));
             _body.SetLinearDamping(LinearDamping);
             _body.SetAngularDamping(AngularDamping);
-            if (Type == Box3DBodyType.Kinematic) _world.AddKinematic(this);
-            else _world.RemoveKinematic(this);
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
+            if (Type == Box3DBodyType.Kinematic) IBox3DWorld.Get(this).AddBody(this);
+            else IBox3DWorld.Get(this).RemoveBody(this);
         }
 #endif
 

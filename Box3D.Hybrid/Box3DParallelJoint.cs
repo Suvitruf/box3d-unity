@@ -41,7 +41,7 @@ namespace Box3D.Hybrid
             def.DampingRatio = DampingRatio;
             def.MaxTorque = MaxTorque;
 
-            _parallel = World.World.CreateParallelJoint(def);
+            _parallel = IBox3DWorld.Get(this).PhysicsWorld.CreateParallelJoint(def);
             return _parallel;
         }
 

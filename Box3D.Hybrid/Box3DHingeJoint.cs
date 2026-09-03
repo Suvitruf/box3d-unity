@@ -57,7 +57,7 @@ namespace Box3D.Hybrid
                 def.MaxMotorTorque = MaxMotorTorque;
             }
 
-            _hinge = World.World.CreateRevoluteJoint(def);
+            _hinge = IBox3DWorld.Get(this).PhysicsWorld.CreateRevoluteJoint(def);
             return _hinge;
         }
 

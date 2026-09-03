@@ -65,7 +65,6 @@ namespace Box3D.Hybrid
         [SerializeField, HideInInspector]
         private Vector3[] BakedPoints; // local space, captured by the editor's Bake button
 
-        private Box3DWorld _world;
         private Body[] _segments;
         private Joint[] _joints;
         private Body _startPin;    // static pin bodies, created only for unattached ends
@@ -100,19 +99,21 @@ namespace Box3D.Hybrid
             _line = GetComponent<LineRenderer>();
             _line.useWorldSpace = true;
 
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
+
             // Start (not Awake) so every Box3DBody the ends may attach to already exists.
-            if (Mode == RopeMode.Baked) BuildBaked();
-            else BuildDynamic();
+            if (Mode == RopeMode.Baked) BuildBaked(world);
+            else BuildDynamic(world);
         }
 
-        private void BuildBaked()
+        private void BuildBaked(IBox3DWorld world)
         {
             Vector3[] points = HasBake ? BakedToWorld() : ComputeSettledPoints();
             ApplyToLine(points);
             if (!BakedCollision || points.Length < 2) return;
 
-            _world = Box3DWorld.Instance;
-            _bakedBody = _world.World.CreateBody(BodyDef.Default); // static, identity — capsules in world coords
+            _bakedBody = world.PhysicsWorld.CreateBody(BodyDef.Default); // static, identity — capsules in world coords
             ShapeDef def = SegmentShapeDef();
             for (int i = 0; i < points.Length - 1; i++)
             {
@@ -125,10 +126,8 @@ namespace Box3D.Hybrid
             }
         }
 
-        private void BuildDynamic()
+        private void BuildDynamic(IBox3DWorld world)
         {
-            _world = Box3DWorld.Instance;
-
             // Spawn taut along the straight line between the ends. The slack lives in the joint
             // rest lengths, so the rope sags into place under gravity and drapes onto whatever it
             // meets — a pre-settled spawn would thread segments through scene geometry, because
@@ -143,6 +142,7 @@ namespace Box3D.Hybrid
             _halfSegment = restLength * 0.5f;
 
             _segments = new Body[Segments];
+            if (world == null || !world.IsValid) return;
             for (int i = 0; i < Segments; i++)
             {
                 float3 a = nodes[i];
@@ -158,7 +158,7 @@ namespace Box3D.Hybrid
                 // Thin, fast-moving segments tunnel through other objects without continuous
                 // collision — bullet mode keeps the rope reacting to everything it sweeps past.
                 bodyDef.IsBullet = true;
-                _segments[i] = _world.World.CreateBody(bodyDef);
+                _segments[i] = world.PhysicsWorld.CreateBody(bodyDef);
 
                 ShapeDef shapeDef = SegmentShapeDef();
                 float cap = Mathf.Max(0.001f, _halfSegment - Radius);
@@ -175,15 +175,15 @@ namespace Box3D.Hybrid
             // Chain: each shared node links the +Z tip of one segment to the -Z tip of the next.
             for (int i = 1; i < Segments; i++)
             {
-                joints.Add(Link(_segments[i - 1], new float3(0f, 0f, _halfSegment),
+                joints.Add(Link(world, _segments[i - 1], new float3(0f, 0f, _halfSegment),
                                 _segments[i], new float3(0f, 0f, -_halfSegment)));
             }
 
             // Ends: a Box3DBody at the endpoint (rope follows/pulls it), else a static world pin.
             Box3DBody startBody = FindStartAttachment();
             Box3DBody endBody = FindEndAttachment();
-            joints.Add(AttachEnd(_segments[0], new float3(0f, 0f, -_halfSegment), nodes[0], startBody, ref _startPin));
-            joints.Add(AttachEnd(_segments[Segments - 1], new float3(0f, 0f, _halfSegment), nodes[Segments], endBody, ref _endPin));
+            joints.Add(AttachEnd(world, _segments[0], new float3(0f, 0f, -_halfSegment), nodes[0], startBody, ref _startPin));
+            joints.Add(AttachEnd(world, _segments[Segments - 1], new float3(0f, 0f, _halfSegment), nodes[Segments], endBody, ref _endPin));
 
             // The attach joints already skip their own pair (collide-connected is off), but the
             // rope's other segments would still hit the attached body — and the near-anchor ones
@@ -191,8 +191,8 @@ namespace Box3D.Hybrid
             // attached body unless collision was explicitly requested.
             if (!CollideWithAttached)
             {
-                if (startBody) FilterAgainst(joints, startBody.Body, _segments[0]);
-                if (endBody) FilterAgainst(joints, endBody.Body, _segments[Segments - 1]);
+                if (startBody) FilterAgainst(world, joints, startBody.Body, _segments[0]);
+                if (endBody) FilterAgainst(world, joints, endBody.Body, _segments[Segments - 1]);
             }
 
             _joints = joints.ToArray();
@@ -211,7 +211,7 @@ namespace Box3D.Hybrid
             return def;
         }
 
-        private void FilterAgainst(List<Joint> joints, Body attached, Body alreadyJointed)
+        private void FilterAgainst(IBox3DWorld world, List<Joint> joints, Body attached, Body alreadyJointed)
         {
             foreach (Body segment in _segments)
             {
@@ -219,21 +219,21 @@ namespace Box3D.Hybrid
                 FilterJointDef def = FilterJointDef.Default;
                 def.Base.BodyIdA = attached.Id;
                 def.Base.BodyIdB = segment.Id;
-                joints.Add(_world.World.CreateFilterJoint(def));
+                joints.Add(world.PhysicsWorld.CreateFilterJoint(def));
             }
         }
 
-        private Joint Link(Body a, float3 localA, Body b, float3 localB)
+        private Joint Link(IBox3DWorld world, Body a, float3 localA, Body b, float3 localB)
         {
             SphericalJointDef def = SphericalJointDef.Default;
             def.Base.BodyIdA = a.Id;
             def.Base.BodyIdB = b.Id;
             def.Base.LocalFrameA = new B3Transform { Position = localA, Rotation = quaternion.identity };
             def.Base.LocalFrameB = new B3Transform { Position = localB, Rotation = quaternion.identity };
-            return _world.World.CreateSphericalJoint(def);
+            return world.PhysicsWorld.CreateSphericalJoint(def);
         }
 
-        private Joint AttachEnd(Body segment, float3 segmentLocal, float3 worldNode, Box3DBody attach, ref Body pin)
+        private Joint AttachEnd(IBox3DWorld world, Body segment, float3 segmentLocal, float3 worldNode, Box3DBody attach, ref Body pin)
         {
             Body other;
             float3 otherLocal;
@@ -248,11 +248,11 @@ namespace Box3D.Hybrid
             {
                 BodyDef pinDef = BodyDef.Default; // static
                 pinDef.Position = worldNode;
-                pin = _world.World.CreateBody(pinDef);
+                pin = world.PhysicsWorld.CreateBody(pinDef);
                 other = pin;
                 otherLocal = float3.zero;
             }
-            return Link(other, otherLocal, segment, segmentLocal);
+            return Link(world, other, otherLocal, segment, segmentLocal);
         }
 
         private void LateUpdate()
@@ -307,14 +307,8 @@ namespace Box3D.Hybrid
         {
             var points = new Vector3[Segments + 1];
             SettleCurve(points, StartWorld, EndWorld,
-                Vector3.Distance(StartWorld, EndWorld) * (1f + Slack) / Segments, SceneGravity(), 240);
+                Vector3.Distance(StartWorld, EndWorld) * (1f + Slack) / Segments, IBox3DWorld.GetSceneGravity(this), 240);
             return points;
-        }
-
-        internal Vector3 SceneGravity()
-        {
-            var world = Application.isPlaying && _world ? _world : FindAnyObjectByType<Box3DWorld>();
-            return world ? world.GravityVector : new Vector3(0f, -9.81f, 0f);
         }
 
         internal float SettledSegmentLength()

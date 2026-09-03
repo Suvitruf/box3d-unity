@@ -27,17 +27,16 @@ namespace Box3D.Hybrid
         [SerializeField, Tooltip("Also save the capture here on stop (empty = don't save).")]
         private string SavePath = "";
 
-        private Box3DWorld _world;
+        private IBox3DWorld _world;
         private Recording _recording;
         private int _steps;
         private bool _isRecording;
 
         private void Start()
         {
-            _world = Box3DWorld.Instance;
-            if (!_world || !_world.World.IsValid) return;
-
-            if (_world.World.GetCounters().BodyCount == 0)
+            _world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(_world)) return;
+            if (_world.PhysicsWorld.GetCounters().BodyCount == 0)
             {
                 Debug.LogWarning("[Box3DRecorder] the Box3DWorld has 0 bodies — the recording will be empty. " +
                     "This recorder captures the component Box3DWorld; scenes that build physics via the raw API " +
@@ -46,7 +45,7 @@ namespace Box3D.Hybrid
             }
 
             _recording = Recording.Create();
-            _world.World.StartRecording(_recording);
+            _world.PhysicsWorld.StartRecording(_recording);
             _isRecording = true;
             _steps = 0;
         }
@@ -62,8 +61,8 @@ namespace Box3D.Hybrid
         [ContextMenu("Stop & Validate")]
         public void Stop()
         {
-            if (!_isRecording || !_world || !_world.World.IsValid) return;
-            _world.World.StopRecording();
+            if (!_isRecording || !_world.IsValid) return;
+            _world.PhysicsWorld.StopRecording();
             _isRecording = false;
             Debug.Log($"[Box3DRecorder] recorded {_steps} steps, {_recording.Size / 1024} KB.", this);
 
@@ -95,7 +94,7 @@ namespace Box3D.Hybrid
 
         private void OnDestroy()
         {
-            if (_isRecording && _world && _world.World.IsValid) _world.World.StopRecording();
+            if (_isRecording && _world.IsValid) _world.PhysicsWorld.StopRecording();
             if (_recording.IsCreated) _recording.Destroy();
         }
     }

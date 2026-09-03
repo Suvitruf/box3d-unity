@@ -1,22 +1,33 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using log4net.DateFormatter;
+using Unity.Scripting.LifecycleManagement;
+using Unity.VectorGraphics;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Box3D.Hybrid
 {
+
+
+
+
     /// <summary>Scene-level owner of a Box3D simulation world. Steps from FixedUpdate, pushes
     /// kinematic bodies before the step and syncs moved bodies back after. Auto-created on demand
-    /// (like Unity's single physics world); place one explicitly to tune gravity, sub-steps, or
+    /// (like Unity's single physics world); place one explicitly to tune Gravity, sub-steps, or
     /// worker count.</summary>
     [Icon("Packages/com.suvitruf.box3d/Box3D.Hybrid.Editor/Icons/Box3DWorld.png")]
     [AddComponentMenu("Box3D/World")]
     [DefaultExecutionOrder(-100)]
     [DisallowMultipleComponent]
-    public class Box3DWorld : MonoBehaviour
+    [NoAutoStaticsCleanup]
+
+
+    public class Box3DWorld : MonoBehaviour, IBox3DWorld
     {
         [SerializeField, Tooltip("Gravity vector applied to every dynamic body.")]
-        private Vector3 Gravity = new Vector3(0f, -9.81f, 0f);
+        private Vector3 Gravity = IBox3DWorld.DefaultGravity;
 
         [SerializeField, Min(1), Tooltip("Solver sub-steps per step. Higher = stiffer, slower.")]
         private int SubStepCount = 4;
@@ -36,26 +47,60 @@ namespace Box3D.Hybrid
         // bodies sync back through move events — which report only bodies that actually moved — so
         // they never appear here. Bodies map back to their component through a GCHandle in userData,
         // so no all-bodies list is kept.
-        private readonly List<Box3DBody> _kinematicBodies = new List<Box3DBody>();
+        private readonly List<Box3DBody> _kinematicBodies = new();
 
         private World _world;
         private Body _anchor;
+
+        World IBox3DWorld.PhysicsWorld => _world;
+        Vector3 IBox3DWorld.Gravity
+        {
+            get => this.Gravity;
+            set { }
+        }
+
+        Vector3 IBox3DWorld.GravityDirection
+        {
+            get
+            {
+                Vector3 absolute = new(Mathf.Abs(this.Gravity.x), Mathf.Abs(this.Gravity.y), Mathf.Abs(this.Gravity.z));
+                return absolute.normalized;
+            }
+        }
+
+        private bool _paused;
+        bool IBox3DWorld.IsPaused
+        {
+            get => _paused;
+            set
+            {
+                _paused = value;
+            }
+        }
+
+        bool IBox3DWorld.IsValid => _world != null && _world.IsValid;
+
+#nullable enable
         private static Box3DWorld _instance;
+        public static IBox3DWorld? Instance
+        {
+            get
+            {
+                if (!_instance)
+                {
+                    _instance = FindAnyObjectByType<Box3DWorld>();
+                    if (!_instance)
+                    {
+                        if (Application.isPlaying)
+                            _instance = new GameObject("Box3D World").AddComponent<Box3DWorld>();
+                    }
+                }
+                return _instance;
+            }
+        }
+#nullable disable
 
-        /// <summary>The underlying Box3D world (valid after this component is enabled).</summary>
-        public World World => _world;
-
-        /// <summary>When true, the world stops stepping (bodies stay put). The visual replayer sets this
-        /// so live physics doesn't fight the replayed transforms.</summary>
-        public bool Paused { get; set; }
-
-        /// <summary>The configured gravity vector (readable without a live world — the rope's
-        /// editor preview settles under the same gravity the simulation will use).</summary>
-        public Vector3 GravityVector => Gravity;
-
-        /// <summary>A shared static body at the origin, used as the fixed endpoint for joints whose
-        /// connected body is null (like Unity's null connectedBody = attach to the world).</summary>
-        public Body WorldAnchor
+        Body IBox3DWorld.WorldAnchor
         {
             get
             {
@@ -65,23 +110,6 @@ namespace Box3D.Hybrid
                     _anchor = _world.CreateBody(BodyDef.Default); // static at origin
                 }
                 return _anchor;
-            }
-        }
-
-        /// <summary>The active world component, creating one if the scene has none.</summary>
-        public static Box3DWorld Instance
-        {
-            get
-            {
-                if (!_instance)
-                {
-                    _instance = FindAnyObjectByType<Box3DWorld>();
-                    if (!_instance)
-                    {
-                        _instance = new GameObject("Box3D World").AddComponent<Box3DWorld>();
-                    }
-                }
-                return _instance;
             }
         }
 
@@ -98,9 +126,8 @@ namespace Box3D.Hybrid
         private void EnsureCreated()
         {
             if (_world.IsValid) return;
-
             WorldDef def = WorldDef.Default;
-            def.Gravity = Gravity;
+            def.Gravity = this.Gravity;
             def.WorkerCount = (uint)(WorkerCount > 0 ? WorkerCount : Mathf.Max(1, SystemInfo.processorCount / 2));
             _world = World.Create(def);
         }
@@ -111,23 +138,23 @@ namespace Box3D.Hybrid
             // Push Inspector edits to the live world during play. SubStepCount and DebugDraw are
             // read every frame anyway; WorkerCount is baked at world creation.
             if (!Application.isPlaying || !_world.IsValid) return;
-            _world.SetGravity(Gravity);
+            _world.SetGravity(this.Gravity);
         }
 #endif
 
-        internal void AddKinematic(Box3DBody body)
+        void IBox3DWorld.AddBody(Box3DBody body)
         {
             if (!_kinematicBodies.Contains(body)) _kinematicBodies.Add(body);
         }
 
-        internal void RemoveKinematic(Box3DBody body)
+        void IBox3DWorld.RemoveBody(Box3DBody body)
         {
             _kinematicBodies.Remove(body);
         }
 
         private void FixedUpdate()
         {
-            if (Paused || !_world.IsValid) return;
+            if (_paused || !_world.IsValid) return;
 
             float deltaTime = Time.fixedDeltaTime;
             for (int i = 0; i < _kinematicBodies.Count; i++)
@@ -156,13 +183,23 @@ namespace Box3D.Hybrid
                 Box3DBody bodyB = BodyFromShape(hitEvent.ShapeIdB);
                 if (bodyA && bodyA.WantsHits)
                 {
-                    bodyA.DispatchHit(new Box3DHit { Point = (Vector3)hitEvent.Point, Direction = -hitEvent.Normal,
-                        ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyB });
+                    bodyA.DispatchHit(new Box3DHit
+                    {
+                        Point = (Vector3)hitEvent.Point,
+                        Direction = -hitEvent.Normal,
+                        ApproachSpeed = hitEvent.ApproachSpeed,
+                        OtherBody = bodyB
+                    });
                 }
                 if (bodyB && bodyB.WantsHits)
                 {
-                    bodyB.DispatchHit(new Box3DHit { Point = (Vector3)hitEvent.Point, Direction = hitEvent.Normal,
-                        ApproachSpeed = hitEvent.ApproachSpeed, OtherBody = bodyA });
+                    bodyB.DispatchHit(new Box3DHit
+                    {
+                        Point = (Vector3)hitEvent.Point,
+                        Direction = hitEvent.Normal,
+                        ApproachSpeed = hitEvent.ApproachSpeed,
+                        OtherBody = bodyA
+                    });
                 }
             }
         }
@@ -187,21 +224,21 @@ namespace Box3D.Hybrid
             }
         }
 
-        // Matches the world component's purple icon so the arrow reads as "the world's gravity".
+        // Matches the world component's purple icon so the arrow reads as "the world's Gravity".
         private static readonly Color GravityGizmoColor = new Color(0.75f, 0.53f, 0.92f, 0.95f);
 
         private void OnDrawGizmosSelected()
         {
-            float magnitude = Gravity.magnitude;
-            if (magnitude < 1e-4f) return; // zero gravity — nothing to point at
+            float magnitude = this.Gravity.magnitude;
+            if (magnitude < 1e-4f) return; // zero Gravity — nothing to point at
 
             Vector3 origin = transform.position;
-            Vector3 dir = Gravity / magnitude;
+            Vector3 dir = this.Gravity / magnitude;
             // Shaft length tracks strength (1 g ≈ 1.5 m), clamped so extreme values stay readable.
             float length = Mathf.Clamp(1.5f * magnitude / 9.81f, 0.4f, 4f);
             Vector3 tip = origin + dir * length;
 
-            // A basis perpendicular to the arrow for the head fins (gravity is usually straight
+            // A basis perpendicular to the arrow for the head fins (Gravity is usually straight
             // down, where Vector3.up is degenerate — fall back to right).
             Vector3 side = Vector3.Cross(dir, Vector3.up);
             if (side.sqrMagnitude < 1e-4f) side = Vector3.Cross(dir, Vector3.right);

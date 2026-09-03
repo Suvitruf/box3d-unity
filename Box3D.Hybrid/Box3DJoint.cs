@@ -21,9 +21,6 @@ namespace Box3D.Hybrid
 
         private Joint _joint;
 
-        /// <summary>The world owning this joint (valid after Start).</summary>
-        protected Box3DWorld World { get; private set; }
-
         /// <summary>The joint pivot in world space.</summary>
         protected Vector3 WorldAnchor => transform.TransformPoint(Anchor);
 
@@ -42,12 +39,9 @@ namespace Box3D.Hybrid
 
         private void Start()
         {
-            World = Box3DWorld.Instance;
-
             Box3DBody self = GetComponent<Box3DBody>();
             BodyId bodyB = self.Body.Id;
-            BodyId bodyA = ConnectedBody ? ConnectedBody.Body.Id : World.WorldAnchor.Id;
-
+            BodyId bodyA = ConnectedBody ? ConnectedBody.Body.Id : IBox3DWorld.Get(ConnectedBody).WorldAnchor.Id;
             _joint = CreateJoint(bodyA, bodyB);
 
             // box3d sets the collide-connected flag at joint creation but does NOT clear a contact

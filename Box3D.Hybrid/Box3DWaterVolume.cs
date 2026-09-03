@@ -71,7 +71,6 @@ namespace Box3D.Hybrid
         private static readonly Color ZoneGizmoColor = new Color(0.25f, 0.6f, 0.9f, 0.9f);
         private static readonly Color SurfaceGizmoColor = new Color(0.25f, 0.6f, 0.9f, 0.25f);
 
-        private Box3DWorld _world;
         private float _lastSurfaceY = float.NaN;
         private bool _warnedTruncated;
 
@@ -142,16 +141,13 @@ namespace Box3D.Hybrid
             return Mathf.Clamp(surface, centerY - halfY, centerY + halfY);
         }
 
-        private void Awake()
-        {
-            _world = Box3DWorld.Instance;
-        }
-
         // Runs after Box3DWorld's step (it uses DefaultExecutionOrder(-100)), so forces land on the
         // next step — a constant one-step latency, the same every frame.
         private void FixedUpdate()
         {
-            if (!_world || _world.Paused || !_world.World.IsValid) return;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
+            if (world.IsPaused) return;
             if (Fill <= 0f)
             {
                 FlushSubmerged();
@@ -175,14 +171,14 @@ namespace Box3D.Hybrid
                 UpperBound = new float3(center.x + half.x, surfaceY + (waves ? WaveAmplitude : 0f), center.z + half.z),
             };
 
-            int count = _world.World.OverlapAABB(water, QueryFilter.Default, _overlap);
+            int count = world.PhysicsWorld.OverlapAABB(water, QueryFilter.Default, _overlap);
             if (count == _overlap.Length && !_warnedTruncated)
             {
                 _warnedTruncated = true;
                 Debug.LogWarning($"[Box3DWaterVolume] more than {_overlap.Length} shapes in the water — extras get no buoyancy this step.", this);
             }
 
-            float3 gravity = (float3)_world.GravityVector;
+            float3 gravity = (float3)world.Gravity;
             float3 current = (float3)Current;
 
             for (int i = 0; i < count; i++)

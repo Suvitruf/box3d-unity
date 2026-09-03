@@ -1,5 +1,7 @@
+
 using System;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Messaging;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -11,7 +13,7 @@ namespace Box3D.Hybrid.Editor
     /// (the rope preview's recipe), so what settles here is what play mode would produce. Also
     /// owns the mouse grab: a kinematic anchor tied to the grabbed body by a ball joint, with the
     /// anchor smoothed toward the cursor so dragging feels springy instead of violent.</summary>
-    internal sealed class Box3DEditorSimulation : IDisposable
+    internal sealed class Box3DEditorSimulation : IDisposable, IBox3DWorld
     {
         private const int SubSteps = 4;
         // Time constant of the anchor's chase toward the cursor — lower is snappier.
@@ -48,6 +50,26 @@ namespace Box3D.Hybrid.Editor
         /// <summary>Where the cursor is pulling the grabbed body toward (valid while grabbing).</summary>
         internal Vector3 GrabTarget => (Vector3)_grabTarget;
 
+        public World PhysicsWorld => _world;
+
+        public Vector3 Gravity { get => _world.GetGravity(); set => _world.SetGravity(value); }
+
+        public Vector3 GravityDirection
+        {
+            get
+            {
+                Vector3 absolute = new(Mathf.Abs(this.Gravity.x), Mathf.Abs(this.Gravity.y), Mathf.Abs(this.Gravity.z));
+                return absolute.normalized;
+            }
+        }
+
+        public bool IsPaused { get => false; set { } }
+
+        public bool IsValid => _world.IsValid;
+
+        public Body WorldAnchor => _grabAnchor;
+
+
         /// <summary>Builds the preview world. <paramref name="bodies"/> must be ordered parents
         /// before children so the write-back leaves nested bodies at their simulated world pose.</summary>
         internal Box3DEditorSimulation(IReadOnlyList<Box3DBody> bodies)
@@ -57,13 +79,13 @@ namespace Box3D.Hybrid.Editor
             Box3DRuntime.Install();
 
             WorldDef worldDef = WorldDef.Default;
-            worldDef.Gravity = SceneGravity();
+            worldDef.Gravity = IBox3DWorld.GetSceneGravity(null);
             _world = World.Create(worldDef);
 
             var simulated = new HashSet<Box3DBody>(bodies);
             foreach (Box3DBody body in bodies)
             {
-                CreateDynamic(body);
+                AddBody(body);
             }
             ReplicateStaticScene(simulated);
         }
@@ -173,7 +195,7 @@ namespace Box3D.Hybrid.Editor
 
         // Mirrors Box3DBody.Awake: a dynamic body at the component's pose, compound shapes gathered
         // from the hierarchy (stopping at nested bodies) and attached at their local frames.
-        private void CreateDynamic(Box3DBody component)
+        public void AddBody(Box3DBody component)
         {
             Transform root = component.transform;
 
@@ -210,6 +232,11 @@ namespace Box3D.Hybrid.Editor
             _entries.Add(new Entry { Component = component, Body = body });
         }
 
+        public void RemoveBody(Box3DBody body)
+        {
+            // no implementation here
+        }
+
         // Every enabled scene shape that doesn't belong to a simulated body becomes static
         // collision at its current pose — the rest of the scene is frozen, exactly like play mode
         // would collide with it if nothing else moved.
@@ -228,12 +255,6 @@ namespace Box3D.Hybrid.Editor
                 shape.CreateDetachedShape(body);
                 _replicated.Add(shape);
             }
-        }
-
-        private static Vector3 SceneGravity()
-        {
-            var world = UnityEngine.Object.FindAnyObjectByType<Box3DWorld>();
-            return world ? world.GravityVector : new Vector3(0f, -9.81f, 0f);
         }
     }
 }

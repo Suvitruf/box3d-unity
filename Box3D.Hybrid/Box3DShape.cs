@@ -84,12 +84,12 @@ namespace Box3D.Hybrid
             // A body on this GameObject or an ancestor will gather and attach this shape (including
             // as a compound child). Otherwise the shape is an orphan → give it a static body.
             if (GetComponentInParent<Box3DBody>()) return;
-
-            Box3DWorld world = Box3DWorld.Instance;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
             BodyDef def = BodyDef.Default; // static by default
             def.Position = transform.position;
             def.Rotation = transform.rotation;
-            _ownBody = world.World.CreateBody(def);
+            _ownBody = world.PhysicsWorld.CreateBody(def);
             AttachTo(_ownBody, float3.zero, quaternion.identity, transform.lossyScale);
         }
 

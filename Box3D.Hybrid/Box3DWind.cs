@@ -31,7 +31,6 @@ namespace Box3D.Hybrid
         [SerializeField, Range(0f, 1f), Tooltip("How hard this wind grips the scene's Box3DWater: fluid at the surface (and foam) gets Strength × this as acceleration in m/s², fading to nothing below the surface. 0 = water ignores this wind.")]
         private float WaterInfluence = 0.25f;
 
-        private Box3DWorld _world;
         private Box3DWater _water;
         private bool _waterSearched;
         private float _currentStrength;
@@ -42,7 +41,6 @@ namespace Box3D.Hybrid
 
         private void Awake()
         {
-            _world = Box3DWorld.Instance;
             _currentStrength = Strength;
         }
 
@@ -50,7 +48,9 @@ namespace Box3D.Hybrid
         // next step — a constant one-step latency, the same every frame.
         private void FixedUpdate()
         {
-            if (!_world || _world.Paused || !_world.World.IsValid) return;
+            IBox3DWorld world = IBox3DWorld.Get(this);
+            if (!IBox3DWorld.Validate(world)) return;
+            if (world.IsPaused) return;
 
             _currentStrength = Strength;
             if (GustAmplitude > 0f && GustFrequency > 0f)
@@ -71,7 +71,7 @@ namespace Box3D.Hybrid
                 UpperBound = (float3)transform.position + worldExtents,
             };
 
-            int count = _world.World.OverlapAABB(aabb, QueryFilter.Default, _overlap);
+            int count = world.PhysicsWorld.OverlapAABB(aabb, QueryFilter.Default, _overlap);
             _bodies.Clear();
             for (int i = 0; i < count; i++)
             {

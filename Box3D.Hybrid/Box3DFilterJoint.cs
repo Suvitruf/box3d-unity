@@ -14,7 +14,7 @@ namespace Box3D.Hybrid
             FilterJointDef def = FilterJointDef.Default;
             def.Base.BodyIdA = bodyA;
             def.Base.BodyIdB = bodyB;
-            return World.World.CreateFilterJoint(def);
+            return IBox3DWorld.Get(this).PhysicsWorld.CreateFilterJoint(def);
         }
     }
 }

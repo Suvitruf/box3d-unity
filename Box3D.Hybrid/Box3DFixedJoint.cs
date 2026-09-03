@@ -26,7 +26,7 @@ namespace Box3D.Hybrid
             def.LinearHertz = LinearHertz;
             def.AngularHertz = AngularHertz;
 
-            _weld = World.World.CreateWeldJoint(def);
+            _weld = IBox3DWorld.Get(this).PhysicsWorld.CreateWeldJoint(def);
             return _weld;
         }
 
