@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.8.2] — 2026-09-03
+
+Feature release: Unity ECS integration and a Burst-callable core, plus per-plane hit details for
+the character mover. No breaking changes — every existing call keeps its signature; the new
+`in`/`out` forms are additions.
+
+### Added — ECS / DOTS integration (experimental)
+- **`Box3D.Entities` assembly** runs Box3D inside Unity ECS. `Box3DBodyDefinition` +
+  `Box3DShapeDefinition` (box / sphere / capsule) describe what to create, `Box3DBodyRef` (a cleanup
+  component) holds the live native body, and `LocalTransform` is the spawn pose in and the
+  simulated pose out. Four systems in `FixedStepSimulationSystemGroup`: lazy world creation, body
+  lifecycle (a plain `DestroyEntity` frees the native body on the next update), Burst-compiled
+  stepping, and Burst-compiled write-back driven by the engine's move events — the entity id rides
+  in the body's user data, so no lookup table.
+- **`Box3DBodyAuthoring`** + baker for subscenes; emits the same definition components.
+- The assembly compiles only when `com.unity.entities` 1.0+ is installed (`versionDefines`);
+  projects without it are unaffected. `Box3D.Entities.Tests` pins the Burst coverage with
+  `[BurstDiscard]` canaries that fail if a system silently falls back to managed code.
+- Docs: [ECS / DOTS integration](Documentation~/entities.md) — mapping, spawning from code, the
+  Burst boundary, current limits (one primitive shape per entity, one-way sync at creation).
+
+### Added — Burst-callable API
+- Burst refuses to P/Invoke functions that pass or return structs by value (BC1064), which
+  box3d's C API does everywhere. These now work from Burst-compiled systems and jobs: `World.Step`,
+  `GetBodyMoveEvents` / `GetContactEvents` / `GetSensorEvents` / `GetJointEvents`, `World.CastRay`
+  (buffer form), `World.OverlapAABB`, the new `World.CastRayClosest(origin, translation, filter,
+  out result)`, the new `Body.GetTransform(out …)`, `Body.SetTransform(in …, in …)`,
+  `Body.ApplyLinearImpulse(in …)`, `Body.ApplyLinearImpulseToCenter(in …)`, and the
+  `LinearVelocity` / `AngularVelocity` properties.
+- Implemented through small pointer-based `b3u_*` glue exports (`Box3D.Native~/glue/`, compiled
+  into the native plugins; the box3d source stays untouched) plus a primitive redeclaration of
+  `b3World_Step`. WebGL keeps the previous direct path — Burst does not target it.
+
+### Added — character mover
+- **`CollideMover` overload with `MoverHit`s** — an index-aligned buffer giving, per plane, the
+  source `ShapeId` and the world-space closest point on that shape. Use it to draw contacts, push
+  dynamic bodies at the contact point, or tune planes per surface. See
+  [character-mover.md](Documentation~/character-mover.md#visualizing-collisions).
+
+### Changed — native plugins
+- **All native plugins rebuilt** (single + double, every platform) from the same pinned box3d
+  commit via the CI workflow, now including the Unity glue (glue version 1). `World.Create` probes
+  the glue once and logs a clear error if a stale binary is loaded (the Burst-routed calls would
+  otherwise throw `EntryPointNotFoundException`). If you build natives yourself, rebuild with the
+  updated `Box3D.Native~` scripts — they now configure through `glue/CMakeLists.txt`.
+
+### Docs
+- Building natives: documents the glue step; the macOS / iOS rows now read "shipped" (the page
+  still said "pending"). `Box3D.Native~/VERSION` lists the full shipped set with build dates.
+
 ## [0.8.1] — 2026-07-31
 
 Maintenance release: a full performance & lifetime audit of the wrapper, with every finding fixed.

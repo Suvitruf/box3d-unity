@@ -24,7 +24,10 @@ if [ -n "${BOX3D_DOUBLE:-}" ]; then
 fi
 OUT=../Plugins/Linux/x86_64
 
-cmake -S "$BOX3D_SRC" -B "$BUILD" \
+# Builds through glue/CMakeLists.txt: the untouched box3d checkout + the Unity glue exports
+# compiled into one library. Outputs land under <build>/box3d/bin (box3d's own output-dir setup).
+cmake -S glue -B "$BUILD" \
+  -DBOX3D_SRC="$BOX3D_SRC" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=ON \
   -DBOX3D_SAMPLES=OFF \
@@ -35,6 +38,6 @@ cmake -S "$BOX3D_SRC" -B "$BUILD" \
 cmake --build "$BUILD" -j "$(nproc)"
 
 mkdir -p "$OUT"
-cp "$BUILD"/bin/libbox3d.so "$OUT/libbox3d$SUFFIX.so" 2>/dev/null || cp "$BUILD"/src/libbox3d.so "$OUT/libbox3d$SUFFIX.so"
+cp "$BUILD"/box3d/bin/libbox3d.so "$OUT/libbox3d$SUFFIX.so"
 
 echo "Done: $OUT/libbox3d$SUFFIX.so"

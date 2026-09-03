@@ -34,16 +34,18 @@ if defined BOX3D_DOUBLE (
   set "BUILD_DIR=%~dp0build-double"
 )
 
+rem Builds through glue\CMakeLists.txt: the untouched box3d checkout + the Unity glue exports
+rem compiled into one dll. Outputs land under <build>\box3d\bin (box3d's own output-dir setup).
 if /I "%GENERATOR%"=="Ninja" (
-  "%CMAKE%" -S "%BOX3D_SRC%" -B "%BUILD_DIR%" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF %PREC_FLAG% || exit /b 1
+  "%CMAKE%" -S "%~dp0glue" -B "%BUILD_DIR%" -G Ninja "-DBOX3D_SRC=%BOX3D_SRC%" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF %PREC_FLAG% || exit /b 1
   "%CMAKE%" --build "%BUILD_DIR%" || exit /b 1
 ) else (
-  "%CMAKE%" -S "%BOX3D_SRC%" -B "%BUILD_DIR%" -G "%GENERATOR%" -A x64 -DBUILD_SHARED_LIBS=ON -DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF %PREC_FLAG% || exit /b 1
+  "%CMAKE%" -S "%~dp0glue" -B "%BUILD_DIR%" -G "%GENERATOR%" -A x64 "-DBOX3D_SRC=%BOX3D_SRC%" -DBUILD_SHARED_LIBS=ON -DBOX3D_SAMPLES=OFF -DBOX3D_UNIT_TESTS=OFF -DBOX3D_BENCHMARKS=OFF %PREC_FLAG% || exit /b 1
   "%CMAKE%" --build "%BUILD_DIR%" --config Release || exit /b 1
 )
 
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
-rem VS puts the dll under bin\Release; single-config Ninja puts it under bin.
-copy /Y "%BUILD_DIR%\bin\Release\box3d.dll" "%OUT_DIR%\box3d%SUFFIX%.dll" 2>nul || copy /Y "%BUILD_DIR%\bin\box3d.dll" "%OUT_DIR%\box3d%SUFFIX%.dll" || exit /b 1
+rem VS puts the dll under box3d\bin\Release; single-config Ninja puts it under box3d\bin.
+copy /Y "%BUILD_DIR%\box3d\bin\Release\box3d.dll" "%OUT_DIR%\box3d%SUFFIX%.dll" 2>nul || copy /Y "%BUILD_DIR%\box3d\bin\box3d.dll" "%OUT_DIR%\box3d%SUFFIX%.dll" || exit /b 1
 
 echo Done: %OUT_DIR%\box3d%SUFFIX%.dll

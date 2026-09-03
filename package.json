@@ -1,6 +1,6 @@
 {
   "name": "com.suvitruf.box3d",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "displayName": "Box3D for Unity",
   "description": "Unity bindings for Box3D, Erin Catto's 3D physics engine. Full C API coverage via P/Invoke: rigid bodies, six shape types, nine joint types, queries, contact/sensor events, a character mover toolkit and debug drawing — with deterministic simulation and strong multithreaded performance.",
   "unity": "6000.0",
@@ -74,6 +74,11 @@
       "displayName": "Physics Water",
       "description": "GPU particle water (Box3DWater): a pool with floating crates, a beach ball and a sinking iron block, a waterfall and a wind zone, plus fill / drain / splash controls and mouse-drag throwing. Water surface rendering requires URP with Depth Texture (Opaque Texture for refraction).",
       "path": "Samples~/PhysicsWater"
+    },
+    {
+      "displayName": "ECS (experimental)",
+      "description": "A box pyramid and sphere rain living as pure entities, simulated by the Box3D.Entities systems and drawn with instanced meshes straight from LocalTransform. Left-click drops a burst of spheres. Requires the Entities package (1.0+) and the Input System package.",
+      "path": "Samples~/Entities"
     }
   ]
 }

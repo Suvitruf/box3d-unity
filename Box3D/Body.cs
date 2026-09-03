@@ -27,18 +27,120 @@ namespace Box3D
 
         public quaternion Rotation => UnsafeBindings.b3Body_GetRotation(Id);
 
-        public B3WorldTransform Transform => UnsafeBindings.b3Body_GetTransform(Id);
-
-        public float3 LinearVelocity
+        public unsafe B3WorldTransform Transform
         {
-            get => UnsafeBindings.b3Body_GetLinearVelocity(Id);
-            set => UnsafeBindings.b3Body_SetLinearVelocity(Id, value);
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return UnsafeBindings.b3Body_GetTransform(Id);
+#else
+                GetTransform(out B3WorldTransform transform);
+                return transform;
+#endif
+            }
         }
 
-        public float3 AngularVelocity
+        /// <summary>The body transform via an out parameter — the form callable from Burst-compiled
+        /// code (Burst cannot P/Invoke the struct-returning property path).</summary>
+        public unsafe void GetTransform(out B3WorldTransform transform)
         {
-            get => UnsafeBindings.b3Body_GetAngularVelocity(Id);
-            set => UnsafeBindings.b3Body_SetAngularVelocity(Id, value);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            transform = UnsafeBindings.b3Body_GetTransform(Id);
+#else
+            BodyId id = Id;
+            B3WorldTransform local;
+            BurstBindings.b3u_Body_GetTransform(*(ulong*)&id, &local);
+            transform = local;
+#endif
+        }
+
+        /// <summary>Teleports the body. The <c>in</c> overload is Burst-callable; the by-value
+        /// form (generated) is not.</summary>
+        public unsafe void SetTransform(in B3Pos position, in quaternion rotation)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            UnsafeBindings.b3Body_SetTransform(Id, position, rotation);
+#else
+            BodyId id = Id;
+            B3Pos localPosition = position;
+            quaternion localRotation = rotation;
+            BurstBindings.b3u_Body_SetTransform(*(ulong*)&id, &localPosition, &localRotation);
+#endif
+        }
+
+        public unsafe float3 LinearVelocity
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return UnsafeBindings.b3Body_GetLinearVelocity(Id);
+#else
+                BodyId id = Id;
+                float3 velocity;
+                BurstBindings.b3u_Body_GetLinearVelocity(*(ulong*)&id, &velocity);
+                return velocity;
+#endif
+            }
+            set
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                UnsafeBindings.b3Body_SetLinearVelocity(Id, value);
+#else
+                BodyId id = Id;
+                BurstBindings.b3u_Body_SetLinearVelocity(*(ulong*)&id, &value);
+#endif
+            }
+        }
+
+        public unsafe float3 AngularVelocity
+        {
+            get
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return UnsafeBindings.b3Body_GetAngularVelocity(Id);
+#else
+                BodyId id = Id;
+                float3 velocity;
+                BurstBindings.b3u_Body_GetAngularVelocity(*(ulong*)&id, &velocity);
+                return velocity;
+#endif
+            }
+            set
+            {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                UnsafeBindings.b3Body_SetAngularVelocity(Id, value);
+#else
+                BodyId id = Id;
+                BurstBindings.b3u_Body_SetAngularVelocity(*(ulong*)&id, &value);
+#endif
+            }
+        }
+
+        /// <summary>Applies an impulse at a world point. The <c>in</c> overload is Burst-callable;
+        /// the by-value form (generated) is not.</summary>
+        public unsafe void ApplyLinearImpulse(in float3 impulse, in B3Pos point, bool wake)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            UnsafeBindings.b3Body_ApplyLinearImpulse(Id, impulse, point, wake);
+#else
+            BodyId id = Id;
+            float3 localImpulse = impulse;
+            B3Pos localPoint = point;
+            BurstBindings.b3u_Body_ApplyLinearImpulse(*(ulong*)&id, &localImpulse, &localPoint, wake);
+#endif
+        }
+
+        /// <summary>Applies a center-of-mass impulse. The <c>in</c> overload is Burst-callable;
+        /// the by-value form (generated) is not.</summary>
+        public unsafe void ApplyLinearImpulseToCenter(in float3 impulse, bool wake)
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            UnsafeBindings.b3Body_ApplyLinearImpulseToCenter(Id, impulse, wake);
+#else
+            BodyId id = Id;
+            float3 localImpulse = impulse;
+            BurstBindings.b3u_Body_ApplyLinearImpulseToCenter(*(ulong*)&id, &localImpulse, wake);
+#endif
         }
 
         public bool IsAwake => UnsafeBindings.b3Body_IsAwake(Id);

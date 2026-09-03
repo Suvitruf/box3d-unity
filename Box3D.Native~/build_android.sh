@@ -44,7 +44,9 @@ OUT="../Plugins/Android/$ABI"
 GENERATOR_ARGS=""
 command -v ninja >/dev/null && GENERATOR_ARGS="-G Ninja"
 
-cmake -S "$BOX3D_SRC" -B "$BUILD" $GENERATOR_ARGS \
+# Builds through glue/CMakeLists.txt: untouched box3d + the Unity glue exports in one library.
+cmake -S glue -B "$BUILD" $GENERATOR_ARGS \
+  -DBOX3D_SRC="$BOX3D_SRC" \
   -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI="$ABI" \
   -DANDROID_PLATFORM=android-23 \
@@ -59,7 +61,7 @@ cmake -S "$BOX3D_SRC" -B "$BUILD" $GENERATOR_ARGS \
 cmake --build "$BUILD" -j
 
 mkdir -p "$OUT"
-cp "$BUILD"/bin/libbox3d.so "$OUT/libbox3d$SUFFIX.so" 2>/dev/null || cp "$BUILD"/src/libbox3d.so "$OUT/libbox3d$SUFFIX.so"
+cp "$BUILD"/box3d/bin/libbox3d.so "$OUT/libbox3d$SUFFIX.so"
 
 STRIP=$(ls "$NDK"/toolchains/llvm/prebuilt/*/bin/llvm-strip 2>/dev/null | head -1)
 [ -n "$STRIP" ] && "$STRIP" --strip-unneeded "$OUT/libbox3d$SUFFIX.so"

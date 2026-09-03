@@ -164,6 +164,7 @@ ones require the Input System package.
 
 - [Getting started](Documentation~/getting-started.md)
 - [Component layer (experimental)](Documentation~/components.md) — author physics in the Inspector
+- [ECS / DOTS integration (experimental)](Documentation~/entities.md) — bodies as entities, Burst-compiled stepping and transform sync
 - [Core concepts](Documentation~/concepts.md) — ids, defs, lifetimes, the rules that matter
 - [Shapes & geometry](Documentation~/shapes-and-geometry.md)
 - [Joints](Documentation~/joints.md)

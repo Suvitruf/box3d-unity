@@ -27,7 +27,9 @@ if [ -n "${BOX3D_DOUBLE:-}" ]; then
     PREC=-DBOX3D_DOUBLE_PRECISION=ON; BUILD=build-ios-double; OUT=double-staging/iOS
 fi
 
-cmake -S "$BOX3D_SRC" -B "$BUILD" -G Xcode \
+# Builds through glue/CMakeLists.txt: untouched box3d + the Unity glue exports in one library.
+cmake -S glue -B "$BUILD" -G Xcode \
+  -DBOX3D_SRC="$BOX3D_SRC" \
   -DCMAKE_SYSTEM_NAME=iOS \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \

@@ -23,7 +23,9 @@ fi
 OUT=../Plugins/macOS
 DYLIB="$OUT/libbox3d$SUFFIX.dylib"
 
-cmake -S "$BOX3D_SRC" -B "$BUILD" \
+# Builds through glue/CMakeLists.txt: untouched box3d + the Unity glue exports in one library.
+cmake -S glue -B "$BUILD" \
+  -DBOX3D_SRC="$BOX3D_SRC" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
@@ -36,7 +38,7 @@ cmake -S "$BOX3D_SRC" -B "$BUILD" \
 cmake --build "$BUILD" -j
 
 mkdir -p "$OUT"
-cp "$BUILD"/bin/libbox3d.dylib "$DYLIB" 2>/dev/null || cp "$BUILD"/src/libbox3d.dylib "$DYLIB"
+cp "$BUILD"/box3d/bin/libbox3d.dylib "$DYLIB"
 # Match the install-name (LC_ID_DYLIB) to the renamed file so it's self-consistent.
 [ -n "$SUFFIX" ] && install_name_tool -id "@rpath/libbox3d$SUFFIX.dylib" "$DYLIB"
 lipo -info "$DYLIB"

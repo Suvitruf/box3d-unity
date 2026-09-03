@@ -1,0 +1,37 @@
+{
+    "name": "Box3D.Entities.Tests",
+    "rootNamespace": "Box3D.Entities.Tests",
+    "references": [
+        "Box3D.Runtime",
+        "Box3D.Entities",
+        "Unity.Entities",
+        "Unity.Transforms",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Unity.Burst",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS",
+        "BOX3D_ENTITIES"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.entities",
+            "expression": "1.0.0",
+            "define": "BOX3D_ENTITIES"
+        }
+    ],
+    "noEngineReferences": false
+}

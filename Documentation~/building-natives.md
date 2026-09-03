@@ -15,8 +15,8 @@ from different Box3D commits.
 | Linux x64 | `Plugins/Linux/x86_64/libbox3d.so` | `build_linux.sh` (gcc + cmake) | shipped |
 | Android arm64-v8a | `Plugins/Android/arm64-v8a/libbox3d.so` | `build_android.bat` (Windows, Unity's bundled NDK) or `build_android.sh` (Linux/macOS host) | shipped |
 | WebGL (wasm static) | `Plugins/WebGL/libbox3d.a` | `build_webgl.sh` (emsdk matching Unity's Emscripten) | shipped |
-| macOS universal | `Plugins/macOS/libbox3d.dylib` | `build_macos.sh` (Xcode) | script ready, binary pending |
-| iOS arm64 (static) | `Plugins/iOS/libbox3d.a` | `build_ios.sh` (Xcode) | script ready, binary pending |
+| macOS universal | `Plugins/macOS/libbox3d.dylib` | `build_macos.sh` (Xcode) | shipped |
+| iOS arm64 (static) | `Plugins/iOS/libbox3d.a` | `build_ios.sh` (Xcode) | shipped |
 
 Each script clones nothing: it needs a Box3D checkout at the pinned commit. All paths are
 resolved automatically where possible and overridable via environment variables:
@@ -30,9 +30,12 @@ resolved automatically where possible and overridable via environment variables:
 | `ANDROID_NDK` / `ANDROID_ABI` | Android (.sh) | Unity Hub NDK probe / `arm64-v8a` |
 | `CLANG_BUILTIN_INCLUDE` | bindgen | newest GCC include dir (for `stdbool.h` etc.) |
 
-Every script configures CMake with `BUILD_SHARED_LIBS=ON` (static for iOS), builds Release, and
-copies the result into `Plugins/`. If a script can't find something it exits with a message naming
-the variable to set.
+Every script configures CMake through `Box3D.Native~/glue/CMakeLists.txt`, which compiles the
+untouched Box3D checkout plus the Unity glue (`glue/box3d_unity_glue.c` — the `b3u_*` exports the
+Burst-callable APIs need) into one library, with `BUILD_SHARED_LIBS=ON` (static for iOS and WebGL),
+builds Release, and copies the result into `Plugins/`. A binary built without the glue still loads,
+but `World.Create` logs a stale-glue error and the Burst-routed calls throw. If a script can't find
+something it exits with a message naming the variable to set.
 
 ## Double-precision variant
 

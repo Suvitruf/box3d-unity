@@ -46,6 +46,30 @@ namespace Box3D.Tests
         }
 
         [Test]
+        public void CollideMover_WithHits_ReportsShapeAndContactPoint()
+        {
+            World world = CreateGroundWorld(out Shape groundShape);
+
+            Span<CollisionPlane> planes = stackalloc CollisionPlane[8];
+            Span<MoverHit> hits = stackalloc MoverHit[8];
+            int count = world.CollideMover(new float3(0f, 0.45f, 0f), MoverCapsule, QueryFilter.Default, planes, hits);
+
+            Assert.Greater(count, 0, "overlapping mover should gather at least one plane");
+            bool foundGround = false;
+            for (int i = 0; i < count; i++)
+            {
+                if (planes[i].Plane.Normal.y <= 0.9f) continue;
+                foundGround = true;
+                Assert.AreEqual(groundShape.Id, hits[i].ShapeId, "hit should reference the ground shape");
+                Assert.AreEqual(0.5f, hits[i].Point.y, 0.1f, "closest point should lie on the ground top (y = 0.5)");
+                Assert.Less(math.length(hits[i].Point.xz), 0.5f, "closest point should be under the capsule");
+            }
+            Assert.IsTrue(foundGround, "ground contact should produce an upward-facing plane");
+
+            world.Destroy();
+        }
+
+        [Test]
         public void SolvePlanes_PushesOutAndClipsVelocity()
         {
             World world = CreateGroundWorld();
@@ -92,10 +116,15 @@ namespace Box3D.Tests
 
         private static World CreateGroundWorld()
         {
+            return CreateGroundWorld(out _);
+        }
+
+        private static World CreateGroundWorld(out Shape groundShape)
+        {
             World world = World.Create(WorldDef.Default);
             Body ground = world.CreateBody(BodyDef.Default);
             BoxHull hull = BoxHull.Create(20f, 0.5f, 20f);
-            ground.CreateHullShape(ShapeDef.Default, in hull);
+            groundShape = ground.CreateHullShape(ShapeDef.Default, in hull);
             return world;
         }
     }

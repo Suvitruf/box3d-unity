@@ -39,4 +39,16 @@ namespace Box3D
         public float3 Delta;
         public int IterationCount;
     }
+
+    /// <summary>Per-plane collision details gathered by
+    /// <see cref="World.CollideMover(float3, in Capsule, QueryFilter, System.Span{CollisionPlane}, System.Span{MoverHit}, float)"/>,
+    /// index-aligned with the CollisionPlane buffer: the shape that produced the plane and the
+    /// closest point on that shape in world space (may not be unique for deep overlaps). Use for
+    /// debug drawing, pushing dynamic bodies, or per-surface plane tuning.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MoverHit
+    {
+        public ShapeId ShapeId;
+        public float3 Point;
+    }
 }

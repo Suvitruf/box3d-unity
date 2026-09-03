@@ -37,7 +37,9 @@ if [ -n "${BOX3D_DOUBLE:-}" ]; then
     PREC=-DBOX3D_DOUBLE_PRECISION=ON; BUILD=build-webgl-double; OUT=double-staging/WebGL
 fi
 
-emcmake cmake -S "$BOX3D_SRC" -B "$BUILD" \
+# Builds through glue/CMakeLists.txt: untouched box3d + the Unity glue exports in one library.
+emcmake cmake -S glue -B "$BUILD" \
+  -DBOX3D_SRC="$BOX3D_SRC" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DBOX3D_DISABLE_SIMD=ON \

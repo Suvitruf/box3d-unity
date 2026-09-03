@@ -13,6 +13,8 @@ namespace Box3D
         private unsafe struct PlaneCollectorContext
         {
             public CollisionPlane* Buffer;
+            public MoverHit* Hits;
+            public float3 Origin;
             public int Capacity;
             public int Count;
             public float PushLimit;
@@ -32,6 +34,15 @@ namespace Box3D
                     Push = 0f,
                     ClipVelocity = true,
                 };
+                if (ctx->Hits != null)
+                {
+                    ctx->Hits[ctx->Count] = new MoverHit
+                    {
+                        ShapeId = shapeId,
+                        // The native point is relative to the mover origin; report world space.
+                        Point = ctx->Origin + planes[i].Point,
+                    };
+                }
                 ctx->Count++;
             }
             return true;
@@ -42,10 +53,30 @@ namespace Box3D
         public int CollideMover(float3 origin, in Capsule mover, QueryFilter filter,
             Span<CollisionPlane> planes, float pushLimit = float.MaxValue)
         {
+            return CollideMover(origin, in mover, filter, planes, Span<MoverHit>.Empty, pushLimit);
+        }
+
+        /// <summary>Same as <see cref="CollideMover(float3, in Capsule, QueryFilter, Span{CollisionPlane}, float)"/>,
+        /// but also records a <see cref="MoverHit"/> (source shape + closest point on it) per plane,
+        /// index-aligned with the planes buffer. Pass an empty hits span to skip recording.</summary>
+        public int CollideMover(float3 origin, in Capsule mover, QueryFilter filter,
+            Span<CollisionPlane> planes, Span<MoverHit> hits, float pushLimit = float.MaxValue)
+        {
+            if (!hits.IsEmpty && hits.Length < planes.Length)
+                throw new ArgumentException("hits buffer must be at least as large as the planes buffer", nameof(hits));
+
             Capsule localMover = mover;
             fixed (CollisionPlane* buffer = planes)
+            fixed (MoverHit* hitBuffer = hits)
             {
-                var ctx = new PlaneCollectorContext { Buffer = buffer, Capacity = planes.Length, PushLimit = pushLimit };
+                var ctx = new PlaneCollectorContext
+                {
+                    Buffer = buffer,
+                    Hits = hitBuffer,
+                    Origin = origin,
+                    Capacity = planes.Length,
+                    PushLimit = pushLimit,
+                };
                 UnsafeBindings.b3World_CollideMover(Id, origin, &localMover, filter, PlaneCollectorPtr, &ctx);
                 return ctx.Count;
             }

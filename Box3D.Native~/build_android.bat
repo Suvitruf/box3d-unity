@@ -35,7 +35,9 @@ if not defined NINJA set "NINJA=C:\Program Files (x86)\Microsoft Visual Studio\2
 set BUILD_DIR=%~dp0build-android
 set OUT_DIR=%~dp0..\Plugins\Android\arm64-v8a
 
-"%CMAKE%" -S "%BOX3D_SRC%" -B "%BUILD_DIR%" -G Ninja ^
+rem Builds through glue\CMakeLists.txt: untouched box3d + the Unity glue exports in one library.
+"%CMAKE%" -S "%~dp0glue" -B "%BUILD_DIR%" -G Ninja ^
+  "-DBOX3D_SRC=%BOX3D_SRC%" ^
   -DCMAKE_MAKE_PROGRAM="%NINJA%" ^
   -DCMAKE_TOOLCHAIN_FILE="%NDK%\build\cmake\android.toolchain.cmake" ^
   -DANDROID_ABI=arm64-v8a ^
@@ -51,7 +53,7 @@ set OUT_DIR=%~dp0..\Plugins\Android\arm64-v8a
 "%CMAKE%" --build "%BUILD_DIR%" || exit /b 1
 
 if not exist "%OUT_DIR%" mkdir "%OUT_DIR%"
-copy /Y "%BUILD_DIR%\bin\libbox3d.so" "%OUT_DIR%\libbox3d.so" || exit /b 1
+copy /Y "%BUILD_DIR%\box3d\bin\libbox3d.so" "%OUT_DIR%\libbox3d.so" || exit /b 1
 "%NDK%\toolchains\llvm\prebuilt\windows-x86_64\bin\llvm-strip.exe" --strip-unneeded "%OUT_DIR%\libbox3d.so"
 
 echo Done: %OUT_DIR%\libbox3d.so

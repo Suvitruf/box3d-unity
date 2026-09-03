@@ -3,18 +3,22 @@ box3d pinned build
 version:  0.1.0
 commit:   29bf523 (v0.1.0-2-g29bf523, "Fixes 02 (#31)")
 source:   /mnt/e/Projects/box3d (E:\Projects\box3d)
-config:   Release, BUILD_SHARED_LIBS=ON (static for iOS), single precision
+config:   Release, BUILD_SHARED_LIBS=ON (static for iOS/WebGL), single precision (+ _d double variants)
 
-Shipped binaries (all built from the commit above):
-- Windows x64   box3d.dll        CI build-natives.yml (Ninja + MSVC 2022)                built 2026-07-07
-- Linux x64     libbox3d.so      build_linux.sh (WSL gcc 13)                             built 2026-07-03
-- Android arm64 libbox3d.so      CI build-natives.yml (NDK r27c, API 23, 16 KB-aligned, stripped)  built 2026-07-07
-- WebGL (wasm)  libbox3d.a       build_webgl.sh (Emscripten 3.1.39 == Unity 6000.0's, static)  built 2026-07-04
-- macOS universal libbox3d.dylib CI build-natives.yml (macos-15, universal x86_64+arm64, min macOS 11.0, ad-hoc signed)  built 2026-07-07
-- iOS arm64     libbox3d.a       CI build-natives.yml (macos-15, arm64 static, min iOS 13.0; C# side
-                                 uses Box3DLibrary.Name = "__Internal" on iOS)             built 2026-07-07
+Shipped binaries (all built from the commit above by the manual GitHub Actions workflow
+.github/workflows/build-natives.yml, precision "both", on 2026-09-01):
+- Windows x64   box3d.dll / box3d_d.dll         Ninja + MSVC 2022
+- Linux x64     libbox3d.so / libbox3d_d.so     ubuntu-latest gcc
+- Android arm64 libbox3d.so / libbox3d_d.so     NDK r27c, API 23, 16 KB-aligned, stripped
+- WebGL (wasm)  libbox3d.a                      Emscripten 3.1.39 == Unity 6000.0's, static (double staged, not shipped)
+- macOS universal libbox3d.dylib / libbox3d_d.dylib  macos-15, universal x86_64+arm64, min macOS 11.0, ad-hoc signed
+- iOS arm64     libbox3d.a                      macos-15, arm64 static, min iOS 13.0; C# side uses
+                                                Box3DLibrary.Name = "__Internal" on iOS (double staged, not shipped)
 
-Native binaries are now built via the manual GitHub Actions workflow (.github/workflows/build-natives.yml)
-from the pinned commit above; Linux and WebGL predate it and are the last local builds.
+Unity glue (glue/box3d_unity_glue.c, b3u_* exports, GLUE VERSION 1): compiled into every binary
+via glue/CMakeLists.txt since 2026-09-01 — the C# Burst paths (queries, events, body accessors)
+require it and World.Create probes b3u_GlueVersion at startup. Every shipped binary above carries
+the glue; a binary built without it logs the stale-glue error and the rerouted APIs throw
+EntryPointNotFoundException.
 
 On version bumps: update this file, rebuild ALL platforms, regenerate bindings, run struct-size tests.

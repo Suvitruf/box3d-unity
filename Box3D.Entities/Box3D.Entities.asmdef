@@ -1,0 +1,30 @@
+{
+    "name": "Box3D.Entities",
+    "rootNamespace": "Box3D.Entities",
+    "references": [
+        "Box3D.Runtime",
+        "Unity.Entities",
+        "Unity.Entities.Hybrid",
+        "Unity.Transforms",
+        "Unity.Mathematics",
+        "Unity.Collections",
+        "Unity.Burst"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "BOX3D_ENTITIES"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.entities",
+            "expression": "1.0.0",
+            "define": "BOX3D_ENTITIES"
+        }
+    ],
+    "noEngineReferences": false
+}

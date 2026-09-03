@@ -7,7 +7,9 @@ deliberate — every game tunes step height, slopes, and jumping differently.
 The pieces:
 
 - `world.CollideMover(origin, capsule, filter, planes)` — finds all surfaces the capsule touches
-  and fills a buffer of `CollisionPlane`s, ready for the solver.
+  and fills a buffer of `CollisionPlane`s, ready for the solver. An overload also fills an
+  index-aligned buffer of `MoverHit`s — the shape behind each plane and the closest point on it —
+  for debug drawing, pushing dynamic bodies, or per-surface tuning.
 - `Mover.SolvePlanes(targetDelta, planes)` — given your intended movement, returns the corrected
   movement that respects every plane (and how hard each plane pushed).
 - `Mover.ClipVector(velocity, planes)` — removes velocity components pointing into surfaces, so
@@ -55,10 +57,29 @@ Run it from `FixedUpdate`, set `_velocity.x/z` from input, add `_velocity.y = ju
 grounded and jump is pressed — that's a working controller. The **Character Mover** sample is
 exactly this plus stairs, a ramp, and obstacles.
 
+## Visualizing collisions
+
+A `CollisionPlane` is an infinite plane (`Normal` + `Offset`), so it has no position of its own.
+To see where the mover is actually being touched, use the hits overload:
+
+```csharp
+Span<CollisionPlane> planes = stackalloc CollisionPlane[16];
+Span<MoverHit> hits = stackalloc MoverHit[16];
+int count = world.CollideMover(_position, Mover, QueryFilter.Default, planes, hits);
+for (int i = 0; i < count; i++)
+{
+    Debug.DrawRay(hits[i].Point, planes[i].Plane.Normal * 0.25f, Color.yellow);
+}
+```
+
+`hits[i].Point` is the world-space closest point on the shape that produced plane `i` (it may not
+be unique for deep overlaps), and `hits[i].ShapeId` identifies that shape.
+
 ## Notes
 
-- The mover is not a body: it doesn't push dynamic objects. If you need that, apply impulses to
-  bodies you detect via the gathered planes' shapes, or give the character a kinematic body too.
+- The mover is not a body: it doesn't push dynamic objects. If you need that, use the `MoverHit`
+  overload of `CollideMover` and apply impulses to the hit shapes' bodies at `hits[i].Point`
+  (opposite the plane normal), or give the character a kinematic body too.
 - Soft platforms: `CollideMover` takes a `pushLimit` (default rigid); lower values make surfaces
   squishy, and such planes should have `ClipVelocity` off.
 - Step climbing quality comes from capsule shape + plane solving; genuinely discrete steps work
