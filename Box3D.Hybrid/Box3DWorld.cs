@@ -178,6 +178,26 @@ namespace Box3D.Hybrid
             }
         }
 
+        /// <summary>Resolves a shape id from a query result or event (<c>RayResult.ShapeId</c>,
+        /// <c>RayHit.ShapeId</c>, a contact event's <c>ShapeIdA</c>/<c>ShapeIdB</c>) to the shape
+        /// component that created it — the component-layer twin of <c>RaycastHit.collider</c>.
+        /// False for shapes made through the code API (rope segments, previews) or already released.</summary>
+        public static bool TryGetShape(ShapeId id, out Box3DShape shape)
+        {
+            shape = Box3DShape.FromId(id);
+            return shape;
+        }
+
+        /// <summary>Resolves a shape id to the <see cref="Box3DBody"/> component owning that shape —
+        /// the twin of <c>RaycastHit.rigidbody</c>. False when the shape has no body component: a
+        /// shape with its own static body (no Box3DBody on it or above it) or a code-API shape.</summary>
+        public static bool TryGetBody(ShapeId id, out Box3DBody body)
+        {
+            Box3DShape shape = Box3DShape.FromId(id);
+            body = shape ? shape.AttachedBody : BodyFromShape(id);
+            return body;
+        }
+
         // Maps a hit event's shape back to its component through the body GCHandle in shape userData
         // (zero for shapes that created their own static body, or preview shapes).
         private static Box3DBody BodyFromShape(ShapeId shapeId)

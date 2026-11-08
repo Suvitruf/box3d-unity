@@ -40,7 +40,7 @@ namespace Box3D.Hybrid
         protected override void UpdateLiveGeometry()
         {
             Resolve(AttachedPosition, AttachedRotation, AttachedScale, out float3 center1, out float3 center2, out float radius);
-            LiveShape.SetCapsule(new Capsule
+            Shape.SetCapsule(new Capsule
             {
                 Center1 = center1,
                 Center2 = center2,

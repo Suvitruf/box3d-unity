@@ -91,7 +91,7 @@ namespace Box3D.Hybrid
             TriangleMesh rebuilt = TriangleMesh.Create(points, triangles);
             if (!rebuilt.IsCreated) return default;
 
-            Shape shape = AttachedBody.CreateMeshShape(BuildDef(), rebuilt);
+            Shape shape = AttachedNativeBody.CreateMeshShape(BuildDef(), rebuilt);
             if (!shape.IsValid)
             {
                 rebuilt.Destroy();

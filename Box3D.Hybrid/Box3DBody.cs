@@ -138,7 +138,7 @@ namespace Box3D.Hybrid
             float3 localPosition = ToBodyLocal(transform, shapeTransform.position);
             quaternion localRotation = math.mul(math.inverse((quaternion)transform.rotation), shapeTransform.rotation);
             shape.AttachTo(_body, localPosition, localRotation, shapeTransform.lossyScale,
-                GCHandle.ToIntPtr(_handle), WantsHits);
+                this, GCHandle.ToIntPtr(_handle), WantsHits);
         }
 
         private void OnEnable()

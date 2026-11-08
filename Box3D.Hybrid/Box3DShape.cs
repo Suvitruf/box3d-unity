@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -10,7 +11,9 @@ namespace Box3D.Hybrid
     /// its own static body, mirroring Unity's "collider without a rigidbody is static".
     /// Adding a shape in the editor auto-adds a <see cref="Box3DBody"/> when the hierarchy has
     /// none (set its type to Static for non-moving geometry).
-    /// Friction and restitution can be changed at runtime; density is baked at creation.</summary>
+    /// Friction and restitution can be changed at runtime; density is baked at creation.
+    /// <see cref="Shape"/> is the native shape and <see cref="AttachedBody"/> the owning component;
+    /// <see cref="Box3DWorld.TryGetShape"/> maps a query hit or event back to the component.</summary>
     public abstract class Box3DShape : MonoBehaviour
     {
         [SerializeField, Min(0f), Tooltip("Density in kg/m³ (mass = density × volume). Baked at creation.")]
@@ -28,6 +31,12 @@ namespace Box3D.Hybrid
         private Shape _shape;
         private Body _attachedBody; // the body this shape was created on (rebuilds recreate on it)
         private Body _ownBody; // only set when this shape has no Box3DBody and creates a static one
+        private Box3DBody _owner; // the component whose body this is attached to (null for an orphan)
+
+        // Every live component shape by native id, so a query result or event (a ShapeId) maps back
+        // to its component — see Box3DWorld.TryGetShape. Shape userData already carries the owner
+        // body's GCHandle for contact events, hence a separate table.
+        private static readonly Dictionary<ShapeId, Box3DShape> Registry = new Dictionary<ShapeId, Box3DShape>();
 
         // The attach frame from AttachTo, kept so Inspector edits can rebuild geometry in place.
         private float3 _attachPosition;
@@ -36,8 +45,24 @@ namespace Box3D.Hybrid
 
         protected float3 LocalCenter => Center;
 
-        /// <summary>The live native shape (valid while active and attached to a live body).</summary>
-        protected Shape LiveShape => _shape;
+        /// <summary>The underlying Box3D shape (valid while the component is active and attached to
+        /// a live body). Its id changes whenever the shape is re-created, e.g. on re-enable.</summary>
+        public Shape Shape => _shape;
+
+        /// <summary>The <see cref="Box3DBody"/> component this shape is attached to, or null for a
+        /// shape with no body on it or above it (it owns a private static body then). Valid alongside
+        /// <see cref="Shape"/> — the component-layer twin of <c>Collider.attachedRigidbody</c>.</summary>
+        public Box3DBody AttachedBody => _owner;
+
+        /// <summary>The live component shape with this native id, or null. Backs
+        /// <see cref="Box3DWorld.TryGetShape"/>.</summary>
+        internal static Box3DShape FromId(ShapeId id)
+        {
+            if (!Registry.TryGetValue(id, out Box3DShape shape)) return null;
+            if (shape && shape._shape.Id.Equals(id)) return shape;
+            Registry.Remove(id); // the component went away without releasing (edit-mode teardown)
+            return null;
+        }
 
         protected float3 AttachedPosition => _attachPosition;
         protected quaternion AttachedRotation => _attachRotation;
@@ -103,6 +128,8 @@ namespace Box3D.Hybrid
 
         private void ReleaseCollision()
         {
+            Registry.Remove(_shape.Id);
+            _owner = null;
             if (_ownBody.IsValid)
             {
                 // Orphan shape: the self-created static body is ours (destroying it destroys the shape).
@@ -151,18 +178,21 @@ namespace Box3D.Hybrid
         /// <summary>Creates the native shape on the given body. <paramref name="localPosition"/> and
         /// <paramref name="localRotation"/> place the shape relative to the body's frame (identity
         /// for a shape on the body's own GameObject); <paramref name="scale"/> is the shape
-        /// GameObject's lossy scale, baked into the dimensions.</summary>
+        /// GameObject's lossy scale, baked into the dimensions. <paramref name="owner"/> is the
+        /// Box3DBody component the body belongs to (null for an orphan shape's own static body).</summary>
         internal void AttachTo(Body body, float3 localPosition, quaternion localRotation, float3 scale,
-            IntPtr ownerData = default, bool enableHitEvents = false)
+            Box3DBody owner = null, IntPtr ownerData = default, bool enableHitEvents = false)
         {
             if (_shape.IsValid) return;
             _attachPosition = localPosition;
             _attachRotation = localRotation;
             _attachScale = scale;
             _attachedBody = body;
+            _owner = owner;
             if (!isActiveAndEnabled) return;
             _shape = CreateShape(body, localPosition, localRotation, scale);
             if (!_shape.IsValid) return;
+            Registry[_shape.Id] = this;
 
             // The owning Box3DBody's GCHandle rides in shape userData, so a contact event maps its
             // ShapeId straight back to the component — the shape-level twin of the body-move channel.
@@ -187,8 +217,9 @@ namespace Box3D.Hybrid
         /// in-place replacement (sphere and capsule). Other shapes keep their creation geometry.</summary>
         protected virtual void UpdateLiveGeometry() { }
 
-        /// <summary>The body this shape was created on (valid alongside <see cref="LiveShape"/>).</summary>
-        protected Body AttachedBody => _attachedBody;
+        /// <summary>The native body this shape was created on (valid alongside <see cref="Shape"/>);
+        /// geometry rebuilds re-create the shape on it.</summary>
+        protected Body AttachedNativeBody => _attachedBody;
 
         /// <summary>Rebuilds the live collision from deformed vertices in this GameObject's local
         /// space — the deformable's Update Collision mode. Hull and mesh shapes support it; other
@@ -205,9 +236,11 @@ namespace Box3D.Hybrid
             Shape rebuilt = CreateRebuiltShape(vertices, triangles);
             if (!rebuilt.IsValid) return false;
 
+            Registry.Remove(_shape.Id);
             _shape.Destroy(updateBodyMass: true); // re-derives mass over remaining + rebuilt shapes
             ReleaseRebuiltGeometry();
             _shape = rebuilt;
+            Registry[_shape.Id] = this;
             if (userData != IntPtr.Zero) _shape.UserData = userData;
             if (hitEvents) _shape.EnableHitEvents(true);
             return true;

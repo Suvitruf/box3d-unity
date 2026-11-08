@@ -65,7 +65,7 @@ namespace Box3D.Hybrid
             Hull hull = Hull.Create(points, MaxVertices);
             if (!hull.IsCreated) return default; // degenerate point cloud — keep the old hull
 
-            Shape shape = AttachedBody.CreateHullShape(BuildDef(), hull);
+            Shape shape = AttachedNativeBody.CreateHullShape(BuildDef(), hull);
             hull.Destroy();
             return shape;
         }

@@ -31,6 +31,13 @@ namespace Box3D.Hybrid
 
         private PrismaticJoint _slider;
 
+        /// <summary>Sets the local slide axis; rebuilds a live joint.</summary>
+        public void SetAxis(Vector3 localAxis)
+        {
+            Axis = localAxis;
+            Rebuild();
+        }
+
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)
         {
             Vector3 worldAxis = transform.TransformDirection(Axis);

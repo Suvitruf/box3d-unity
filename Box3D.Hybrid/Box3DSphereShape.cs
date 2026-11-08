@@ -19,7 +19,7 @@ namespace Box3D.Hybrid
 
         protected override void UpdateLiveGeometry()
         {
-            LiveShape.SetSphere(BuildSphere(AttachedPosition, AttachedRotation, AttachedScale));
+            Shape.SetSphere(BuildSphere(AttachedPosition, AttachedRotation, AttachedScale));
         }
 
         private Sphere BuildSphere(float3 localPosition, quaternion localRotation, float3 scale)

@@ -31,10 +31,11 @@ namespace Box3D.Hybrid
 
         private RevoluteJoint _hinge;
 
-        /// <summary>Sets the local hinge axis. Must be set before the joint is created (Start).</summary>
+        /// <summary>Sets the local hinge axis; rebuilds a live joint.</summary>
         public void SetAxis(Vector3 localAxis)
         {
             Axis = localAxis;
+            Rebuild();
         }
 
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)
