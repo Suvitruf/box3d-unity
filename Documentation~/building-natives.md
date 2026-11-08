@@ -37,6 +37,12 @@ builds Release, and copies the result into `Plugins/`. A binary built without th
 but `World.Create` logs a stale-glue error and the Burst-routed calls throw. If a script can't find
 something it exits with a message naming the variable to set.
 
+**Linux glibc baseline.** A Linux `.so` binds to the glibc symbol versions of the machine that
+linked it and refuses to load on anything older (`version 'GLIBC_2.43' not found`). Build on
+Ubuntu 22.04 or 24.04: the CI workflow builds inside an `ubuntu:22.04` container (glibc 2.35, the
+oldest Linux that Unity 6 players support) and fails the job if the result needs a newer symbol
+version. To check a binary: `objdump -T libbox3d.so | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1`.
+
 ## Double-precision variant
 
 Every build script also produces the opt-in [double-precision](double-precision.md) library when
@@ -97,10 +103,10 @@ are invalid, including meshes whose triangles collapse during welding. The sourc
 left untouched. Configuration stops if the expected upstream code no longer matches, so review
 this fix when updating Box3D.
 
-Windows x64 and Linux x64 binaries, in both precision modes, include this fix as of 2026-09-08.
-Other shipped binaries retain their previous builds. `TriangleMesh.Create` validates input before
-calling native code on every platform, including the welding result, to avoid the affected failure
-path on those older binaries. Direct C API consumers must rebuild to get native cleanup.
+Every shipped binary includes this fix as of 2026-11-08 (Windows and Linux since 2026-09-08).
+`TriangleMesh.Create` additionally validates input before calling native code on every platform,
+including the welding result. Direct C API consumers building Box3D themselves get the fix by
+building through this CMake project.
 
 To run the native regression on a desktop build, configure the wrapper CMake project with
 `-DBOX3D_UNITY_TESTS=ON`, build the `mesh_cleanup_test` target, and run

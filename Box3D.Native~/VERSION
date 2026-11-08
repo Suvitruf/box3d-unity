@@ -5,29 +5,30 @@ commit:   29bf523 (v0.1.0-2-g29bf523, "Fixes 02 (#31)")
 source:   /mnt/e/Projects/box3d (E:\Projects\box3d)
 config:   Release, BUILD_SHARED_LIBS=ON (static for iOS/WebGL), single precision (+ _d double variants)
 
-Shipped binaries (all use the commit above; platform build provenance below):
-- Windows x64   box3d.dll / box3d_d.dll         MSVC 2022 19.44, local Release build 2026-11-07 (glue 2) + mesh cleanup fix
-- Linux x64     libbox3d.so / libbox3d_d.so     GCC 13.3, local Release build 2026-11-07 (glue 2) + mesh cleanup fix
-- Android arm64 libbox3d.so / libbox3d_d.so     NDK r27c, API 23, 16 KB-aligned, stripped
-- WebGL (wasm)  libbox3d.a                      Emscripten 3.1.39 == Unity 6000.0's, static (double staged, not shipped)
-- macOS universal libbox3d.dylib / libbox3d_d.dylib  macos-15, universal x86_64+arm64, min macOS 11.0, ad-hoc signed
-- iOS arm64     libbox3d.a                      macos-15, arm64 static, min iOS 13.0; C# side uses
+Shipped binaries (all built from the commit above with glue 2 and the mesh cleanup fix; "workflow"
+= the build-natives GitHub Actions run of 2026-11-08, precision "both", run 42438683240):
+- Windows x64   box3d.dll / box3d_d.dll         MSVC 19.51 (windows-latest), static CRT (imports KERNEL32 only), workflow
+- Linux x64     libbox3d.so / libbox3d_d.so     GCC 13.3 on Ubuntu 24.04, local Release build 2026-11-07, runs on glibc >= 2.34
+- Android arm64 libbox3d.so / libbox3d_d.so     NDK r27c, API 23, 16 KB-aligned, stripped, workflow
+- WebGL (wasm)  libbox3d.a                      Emscripten 3.1.39 == Unity 6000.0's, static, workflow (double staged, not shipped)
+- macOS universal libbox3d.dylib / libbox3d_d.dylib  macos-15, universal x86_64+arm64, min macOS 11.0, ad-hoc signed, workflow
+- iOS arm64     libbox3d.a                      macos-15, arm64 static, min iOS 13.0, workflow; C# side uses
                                                 Box3DLibrary.Name = "__Internal" on iOS (double staged, not shipped)
 
-Android, WebGL, macOS and iOS retain the 2026-09-01 manual GitHub Actions builds
-(.github/workflows/build-natives.yml, precision "both") and therefore still carry glue 1 — fine
-for single precision, but their _d variants must be rebuilt (the workflow now commits the
-binaries back to the branch itself) before double precision is used on those platforms. Their managed TriangleMesh.Create
-entry point now validates bounds and degenerate/welded-away triangles before native calls.
-All future builds apply the mesh cleanup fix through glue/CMakeLists.txt without editing the
-source checkout. Native API users on the older builds must rebuild to get that cleanup.
+Linux glibc baseline: a .so binds to the glibc symbol versions of the host that linked it. The
+2026-11-08 workflow run built Linux on ubuntu-latest (26.04, glibc 2.43); those libraries fail to
+load on Ubuntu 24.04 and older ("version `GLIBC_2.43' not found": sqrtf, remainderf), so the two
+Linux files were reverted to the local build. The workflow now builds Linux inside an ubuntu:22.04
+container (glibc 2.35, the oldest Linux Unity 6 players support) and fails the job if the result
+needs anything newer. Build locally on Ubuntu 24.04 or older for the same reason.
 
 Unity glue (glue/box3d_unity_glue.c, b3u_* exports, GLUE VERSION 2): compiled into every binary
 via glue/CMakeLists.txt since 2026-09-01. Version 2 (2026-11-07) widens b3u_RayHit's point to b3Pos;
 the single-precision layout is unchanged, so only BOX3D_DOUBLE builds require it (the C# side
-logs an error for an older _d library). Since 2026-09-01 — the C# Burst paths (queries, events, body accessors)
-require it and World.Create probes b3u_GlueVersion at startup. Every shipped binary above carries
-the glue; a binary built without it logs the stale-glue error and the rerouted APIs throw
+logs an error for an older _d library). The C# Burst paths (queries, events, body accessors)
+require the glue and World.Create probes b3u_GlueVersion at startup. Every shipped binary above
+carries it; a binary built without it logs the stale-glue error and the rerouted APIs throw
 EntryPointNotFoundException.
 
-On version bumps: update this file, rebuild ALL platforms, regenerate bindings, run struct-size tests.
+On version bumps: update this file, rebuild ALL platforms (run the build-natives workflow),
+regenerate bindings, run struct-size tests.
