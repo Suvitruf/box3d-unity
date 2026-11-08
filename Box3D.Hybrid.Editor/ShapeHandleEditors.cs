@@ -6,26 +6,28 @@ namespace Box3D.Hybrid.Editor
 {
     /// <summary>Scene-view editing for the sphere shape: drag the radius like a Unity collider.
     /// Handles are drawn in a position+rotation frame with the lossy scale baked into dimensions,
-    /// matching how the physics shape is built.</summary>
+    /// matching how the physics shape is built. The inspector itself is Unity's default one, so a
+    /// multi-object selection edits fields with mixed values as usual; OnSceneGUI runs once per
+    /// selected shape and edits that shape's own SerializedObject (see
+    /// <see cref="TargetSerializedObjects"/>).</summary>
     [CustomEditor(typeof(Box3DSphereShape))]
+    [CanEditMultipleObjects]
     public class Box3DSphereShapeEditor : UnityEditor.Editor
     {
         private readonly SphereBoundsHandle _handle = new SphereBoundsHandle();
-        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
-        private SerializedProperty _radius;
-        private SerializedProperty _center;
+        private readonly TargetSerializedObjects _shapes = new TargetSerializedObjects();
 
-        private void OnEnable()
+        private void OnDisable()
         {
-            _radius = serializedObject.FindProperty("Radius");
-            _center = serializedObject.FindProperty("Center");
+            _shapes.Dispose();
         }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DSphereShape)target).transform;
-            SerializedProperty radius = _radius;
-            SerializedProperty center = _center;
+            SerializedObject shape = _shapes.Update(target);
+            SerializedProperty radius = _shapes.Property(target, "Radius");
+            SerializedProperty center = _shapes.Property(target, "Center");
 
             float scale = Mathf.Max(0.0001f, ShapeHandleMath.MaxAbs(t.lossyScale));
             using (new Handles.DrawingScope(Matrix4x4.TRS(t.position, t.rotation, Vector3.one)))
@@ -40,7 +42,7 @@ namespace Box3D.Hybrid.Editor
                     Undo.RecordObject(target, "Edit Sphere Shape");
                     radius.floatValue = _handle.radius / scale;
                     center.vector3Value = ShapeHandleMath.Unscale(_handle.center, t.lossyScale);
-                    serializedObject.ApplyModifiedProperties();
+                    shape.ApplyModifiedProperties();
                 }
             }
         }
@@ -48,24 +50,23 @@ namespace Box3D.Hybrid.Editor
 
     /// <summary>Scene-view editing for the box shape: drag the faces to resize.</summary>
     [CustomEditor(typeof(Box3DBoxShape))]
+    [CanEditMultipleObjects]
     public class Box3DBoxShapeEditor : UnityEditor.Editor
     {
         private readonly BoxBoundsHandle _handle = new BoxBoundsHandle();
-        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
-        private SerializedProperty _size;
-        private SerializedProperty _center;
+        private readonly TargetSerializedObjects _shapes = new TargetSerializedObjects();
 
-        private void OnEnable()
+        private void OnDisable()
         {
-            _size = serializedObject.FindProperty("Size");
-            _center = serializedObject.FindProperty("Center");
+            _shapes.Dispose();
         }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DBoxShape)target).transform;
-            SerializedProperty size = _size;
-            SerializedProperty center = _center;
+            SerializedObject shape = _shapes.Update(target);
+            SerializedProperty size = _shapes.Property(target, "Size");
+            SerializedProperty center = _shapes.Property(target, "Center");
 
             Vector3 scale = ShapeHandleMath.Abs(t.lossyScale);
             using (new Handles.DrawingScope(Matrix4x4.TRS(t.position, t.rotation, Vector3.one)))
@@ -80,7 +81,7 @@ namespace Box3D.Hybrid.Editor
                     Undo.RecordObject(target, "Edit Box Shape");
                     size.vector3Value = ShapeHandleMath.Unscale(_handle.size, scale);
                     center.vector3Value = ShapeHandleMath.Unscale(_handle.center, t.lossyScale);
-                    serializedObject.ApplyModifiedProperties();
+                    shape.ApplyModifiedProperties();
                 }
             }
         }
@@ -89,30 +90,25 @@ namespace Box3D.Hybrid.Editor
     /// <summary>Scene-view editing for the capsule shape: drag radius and height. Radius scales by
     /// the perpendicular axes and height by the capsule axis, matching the physics shape.</summary>
     [CustomEditor(typeof(Box3DCapsuleShape))]
+    [CanEditMultipleObjects]
     public class Box3DCapsuleShapeEditor : UnityEditor.Editor
     {
         private readonly CapsuleBoundsHandle _handle = new CapsuleBoundsHandle();
-        // Cached once — OnSceneGUI runs per scene-view event, and FindProperty re-walks the path.
-        private SerializedProperty _radius;
-        private SerializedProperty _height;
-        private SerializedProperty _center;
-        private SerializedProperty _direction;
+        private readonly TargetSerializedObjects _shapes = new TargetSerializedObjects();
 
-        private void OnEnable()
+        private void OnDisable()
         {
-            _radius = serializedObject.FindProperty("Radius");
-            _height = serializedObject.FindProperty("Height");
-            _center = serializedObject.FindProperty("Center");
-            _direction = serializedObject.FindProperty("Direction");
+            _shapes.Dispose();
         }
 
         private void OnSceneGUI()
         {
             Transform t = ((Box3DCapsuleShape)target).transform;
-            SerializedProperty radius = _radius;
-            SerializedProperty height = _height;
-            SerializedProperty center = _center;
-            int direction = _direction.enumValueIndex; // 0=X, 1=Y, 2=Z
+            SerializedObject shape = _shapes.Update(target);
+            SerializedProperty radius = _shapes.Property(target, "Radius");
+            SerializedProperty height = _shapes.Property(target, "Height");
+            SerializedProperty center = _shapes.Property(target, "Center");
+            int direction = _shapes.Property(target, "Direction").enumValueIndex; // 0=X, 1=Y, 2=Z
 
             Vector3 absScale = ShapeHandleMath.Abs(t.lossyScale);
             float axisScale = Mathf.Max(0.0001f, absScale[direction]);
@@ -133,7 +129,7 @@ namespace Box3D.Hybrid.Editor
                     radius.floatValue = _handle.radius / radialScale;
                     height.floatValue = _handle.height / axisScale;
                     center.vector3Value = ShapeHandleMath.Unscale(_handle.center, t.lossyScale);
-                    serializedObject.ApplyModifiedProperties();
+                    shape.ApplyModifiedProperties();
                 }
             }
         }
