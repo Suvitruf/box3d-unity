@@ -53,7 +53,11 @@ BOX3D_DOUBLE=1 bash build_linux.sh     # → Plugins/Linux/x86_64/libbox3d_d.so
 ```
 
 The `build-natives` CI workflow has a matching `precision` input (`single` / `double` / `both`,
-default `both`) and builds the same outputs on every platform in one run.
+default `both`) and builds the same outputs on every platform in one run. With its `commit` input
+on (the default) a final job merges every platform's binaries into `Plugins/` and pushes one
+commit to the branch the workflow was started from; the binaries are also kept as run artifacts.
+The iOS/WebGL double archives only ever ship inside those artifacts (their staging folder is
+gitignored). The job is skipped when any platform fails, so a partial set is never committed.
 
 ## WebGL specifics
 
