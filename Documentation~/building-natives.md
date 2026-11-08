@@ -63,7 +63,11 @@ default `both`) and builds the same outputs on every platform in one run. With i
 on (the default) a final job merges every platform's binaries into `Plugins/` and pushes one
 commit to the branch the workflow was started from; the binaries are also kept as run artifacts.
 The iOS/WebGL double archives only ever ship inside those artifacts (their staging folder is
-gitignored). The job is skipped when any platform fails, so a partial set is never committed.
+gitignored). The job is skipped when any platform fails, so a partial set is never committed, and
+binaries that come out byte-identical to the checked-in ones are not committed either. The builds
+are reproducible so that this holds: clang and gcc output already is, and the Windows DLL links
+with `/Brepro` (set in `glue/CMakeLists.txt`) because `link.exe` otherwise stamps the build time
+into the PE header and export table.
 
 ## WebGL specifics
 

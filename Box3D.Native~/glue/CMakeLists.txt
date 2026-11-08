@@ -16,6 +16,13 @@ endif()
 add_subdirectory("${BOX3D_SRC}" "${CMAKE_BINARY_DIR}/box3d")
 target_sources(box3d PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/box3d_unity_glue.c")
 
+# Reproducible output on MSVC: link.exe otherwise stamps the current time into the COFF header
+# and the export directory, so every CI run yields a "new" box3d.dll even when nothing changed
+# and the build-natives workflow commits it. /Brepro replaces both stamps with a content hash.
+if(MSVC)
+    target_link_options(box3d PRIVATE /Brepro)
+endif()
+
 # v0.1.0 leaks the cloned vertices/indices when mesh bounds are invalid (e.g. all
 # triangles degenerate after welding). Patch only a build-local translation unit.
 file(READ "${BOX3D_SRC}/src/mesh.c" mesh_source)
