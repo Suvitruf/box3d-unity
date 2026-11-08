@@ -50,7 +50,7 @@ namespace Box3D.Tests
             World world = CreateThreeSphereWorld(out Shape left, out Shape middle, out Shape right);
 
             Span<RayHit> hits = stackalloc RayHit[8];
-            int count = world.CastRay(new float3(-10f, 0f, 0f), new float3(20f, 0f, 0f), QueryFilter.Default, hits);
+            int count = world.CastRay(new B3Pos(-10f, 0f, 0f), new float3(20f, 0f, 0f), QueryFilter.Default, hits);
 
             Assert.AreEqual(3, count, "ray through all three spheres should report three hits");
             for (int i = 0; i < count; i++)
@@ -99,7 +99,7 @@ namespace Box3D.Tests
 
             Span<float3> proxyPoint = stackalloc float3[] { float3.zero };
             Span<RayHit> hits = stackalloc RayHit[8];
-            int count = world.CastShape(new float3(-10f, 0f, 0f), proxyPoint, 0.3f,
+            int count = world.CastShape(new B3Pos(-10f, 0f, 0f), proxyPoint, 0.3f,
                 new float3(20f, 0f, 0f), QueryFilter.Default, hits);
 
             Assert.AreEqual(3, count, "swept sphere along the row should hit all three");

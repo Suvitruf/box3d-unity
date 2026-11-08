@@ -14,7 +14,7 @@ namespace Box3D
         {
             public CollisionPlane* Buffer;
             public MoverHit* Hits;
-            public float3 Origin;
+            public B3Pos Origin;
             public int Capacity;
             public int Count;
             public float PushLimit;
@@ -39,7 +39,7 @@ namespace Box3D
                     ctx->Hits[ctx->Count] = new MoverHit
                     {
                         ShapeId = shapeId,
-                        // The native point is relative to the mover origin; report world space.
+                        // The native point is relative to the mover origin; report a world position.
                         Point = ctx->Origin + planes[i].Point,
                     };
                 }
@@ -49,17 +49,18 @@ namespace Box3D
         }
 
         /// <summary>Collides a capsule mover with the world and assembles rigid collision planes
-        /// ready for <see cref="Mover.SolvePlanes"/>. Fills the buffer, returns the count.</summary>
-        public int CollideMover(float3 origin, in Capsule mover, QueryFilter filter,
+        /// ready for <see cref="Mover.SolvePlanes"/>. The capsule is relative to origin (a world
+        /// <see cref="B3Pos"/>). Fills the buffer, returns the count.</summary>
+        public int CollideMover(B3Pos origin, in Capsule mover, QueryFilter filter,
             Span<CollisionPlane> planes, float pushLimit = float.MaxValue)
         {
             return CollideMover(origin, in mover, filter, planes, Span<MoverHit>.Empty, pushLimit);
         }
 
-        /// <summary>Same as <see cref="CollideMover(float3, in Capsule, QueryFilter, Span{CollisionPlane}, float)"/>,
+        /// <summary>Same as <see cref="CollideMover(B3Pos, in Capsule, QueryFilter, Span{CollisionPlane}, float)"/>,
         /// but also records a <see cref="MoverHit"/> (source shape + closest point on it) per plane,
         /// index-aligned with the planes buffer. Pass an empty hits span to skip recording.</summary>
-        public int CollideMover(float3 origin, in Capsule mover, QueryFilter filter,
+        public int CollideMover(B3Pos origin, in Capsule mover, QueryFilter filter,
             Span<CollisionPlane> planes, Span<MoverHit> hits, float pushLimit = float.MaxValue)
         {
             if (!hits.IsEmpty && hits.Length < planes.Length)
@@ -82,9 +83,10 @@ namespace Box3D
             }
         }
 
-        /// <summary>Sweeps a capsule mover along a translation. Returns the fraction [0,1] of the
-        /// translation that can be taken before hitting something (1 = free path).</summary>
-        public float CastMover(float3 origin, in Capsule mover, float3 translation, QueryFilter filter)
+        /// <summary>Sweeps a capsule mover along a translation. The capsule is relative to origin (a
+        /// world <see cref="B3Pos"/>). Returns the fraction [0,1] of the translation that can be
+        /// taken before hitting something (1 = free path).</summary>
+        public float CastMover(B3Pos origin, in Capsule mover, float3 translation, QueryFilter filter)
         {
             Capsule localMover = mover;
             return UnsafeBindings.b3World_CastMover(Id, origin, &localMover, translation, filter, IntPtr.Zero, null);

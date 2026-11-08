@@ -21,6 +21,8 @@ int count = world.CastRay(origin, translation, QueryFilter.Default, hits);
 ```
 
 Note `translation` is the full ray vector (direction × distance), not a normalized direction.
+Every query `origin` is a world position (`B3Pos`) — `float3` and `Vector3` convert to it
+implicitly, and under [`BOX3D_DOUBLE`](double-precision.md) it keeps full double precision.
 
 ## Overlaps
 

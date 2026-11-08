@@ -12,7 +12,8 @@ namespace Box3D
     }
 
     /// <summary>Mirrors native b3PlaneResult (28 bytes): the separating plane between a mover and
-    /// a shape, plus the closest point on the shape.</summary>
+    /// a shape, plus the closest point on the shape. Both are relative to the mover origin (float in
+    /// both precision modes); <see cref="MoverHit"/> carries the point as a world position.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct PlaneResult
     {
@@ -41,14 +42,14 @@ namespace Box3D
     }
 
     /// <summary>Per-plane collision details gathered by
-    /// <see cref="World.CollideMover(float3, in Capsule, QueryFilter, System.Span{CollisionPlane}, System.Span{MoverHit}, float)"/>,
+    /// <see cref="World.CollideMover(B3Pos, in Capsule, QueryFilter, System.Span{CollisionPlane}, System.Span{MoverHit}, float)"/>,
     /// index-aligned with the CollisionPlane buffer: the shape that produced the plane and the
-    /// closest point on that shape in world space (may not be unique for deep overlaps). Use for
-    /// debug drawing, pushing dynamic bodies, or per-surface plane tuning.</summary>
+    /// closest point on that shape as a world position (may not be unique for deep overlaps). Use
+    /// for debug drawing, pushing dynamic bodies, or per-surface plane tuning.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct MoverHit
     {
         public ShapeId ShapeId;
-        public float3 Point;
+        public B3Pos Point;
     }
 }

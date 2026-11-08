@@ -69,7 +69,11 @@ under either define.
 
 Where these appear: `Body.Position` / `Body.Transform`, `BodyDef.Position`, `BodyMoveEvent`,
 `RayResult.Point`, `ContactHitEvent.Point`, `ExplosionDef.Position`, apply-force/impulse points,
-and the debug-draw callbacks.
+the `origin` of every world query (`CastRay`, `CastRayClosest`, `CastShape`, `OverlapShape`,
+`CollideMover`, `CastMover`), `MoverHit.Point`, and the debug-draw callbacks. Query proxies, mover
+capsules and translations are relative to that origin and stay float. `B3Pos` also offers
+`+`/`-` with a `float3` (offset a position) and `B3Pos - B3Pos` (the float offset between two
+positions, computed at full precision before narrowing).
 
 Behavioral differences in double mode:
 
@@ -81,6 +85,9 @@ Behavioral differences in double mode:
   position bits, so compare hashes only between builds of the same precision.
 - **`Box3DWaterVolume` samples its surface in float** — correct near the origin; for genuinely
   far-from-origin water, position the volume (and your render origin) near the action.
+- **All-hits casts report `RayHit.Point` in float** (`CastRay` / `CastShape` buffer forms) — the
+  hit point is narrowed after the query. For a full-precision hit point far from the origin use
+  `CastRayClosest`, whose `RayResult.Point` is a `B3Pos`.
 
 ## The render side (floating origin)
 

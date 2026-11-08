@@ -88,13 +88,15 @@ namespace Box3D
         }
 
         /// <summary>Finds shapes overlapping a convex point-cloud proxy (a sphere when one point,
-        /// a capsule when two, a hull otherwise) placed at origin. Fills the buffer, returns the count.</summary>
-        public int OverlapShape(float3 origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
+        /// a capsule when two, a hull otherwise) placed at origin. The proxy points are relative to
+        /// origin (a world <see cref="B3Pos"/>), so the query stays precise far from the world origin.
+        /// Fills the buffer, returns the count.</summary>
+        public int OverlapShape(B3Pos origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
             QueryFilter filter, Span<ShapeId> results)
             => OverlapShape(origin, proxyPoints, proxyRadius, filter, results, out _);
 
         /// <summary>As the other <c>OverlapShape</c>, also reporting broadphase-tree work.</summary>
-        public unsafe int OverlapShape(float3 origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
+        public unsafe int OverlapShape(B3Pos origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
             QueryFilter filter, Span<ShapeId> results, out TreeStats stats)
         {
             if (proxyPoints.IsEmpty) throw new ArgumentException("proxy needs at least one point", nameof(proxyPoints));
@@ -110,13 +112,15 @@ namespace Box3D
         }
 
         /// <summary>Collects every hit along the ray (unordered). Fills the buffer, returns the
-        /// count. For just the nearest hit use <see cref="CastRayClosest"/>.</summary>
-        public int CastRay(float3 origin, float3 translation, QueryFilter filter, Span<RayHit> hits)
+        /// count. For just the nearest hit use <see cref="CastRayClosest"/>. Note that
+        /// <see cref="RayHit.Point"/> is reported in float even under <c>BOX3D_DOUBLE</c>; the
+        /// closest-hit form returns a full-precision <see cref="B3Pos"/>.</summary>
+        public int CastRay(B3Pos origin, float3 translation, QueryFilter filter, Span<RayHit> hits)
             => CastRay(origin, translation, filter, hits, out _);
 
         /// <summary>As the other <c>CastRay</c>, also reporting broadphase-tree work.
         /// Burst-callable (the buffer-filling collector runs in the native glue).</summary>
-        public unsafe int CastRay(float3 origin, float3 translation, QueryFilter filter, Span<RayHit> hits, out TreeStats stats)
+        public unsafe int CastRay(B3Pos origin, float3 translation, QueryFilter filter, Span<RayHit> hits, out TreeStats stats)
         {
             fixed (RayHit* buffer = hits)
             {
@@ -127,9 +131,8 @@ namespace Box3D
                 return ctx.Count;
 #else
                 WorldId id = Id;
-                B3Pos localOrigin = origin;
                 b3TreeStats s;
-                int count = BurstBindings.b3u_World_CastRay(*(uint*)&id, &localOrigin, &translation, &filter,
+                int count = BurstBindings.b3u_World_CastRay(*(uint*)&id, &origin, &translation, &filter,
                     buffer, hits.Length, &s);
                 stats = new TreeStats { NodeVisits = s.nodeVisits, LeafVisits = s.leafVisits };
                 return count;
@@ -153,13 +156,14 @@ namespace Box3D
         }
 
         /// <summary>Sweeps a convex point-cloud proxy from origin along translation, collecting
-        /// every hit (unordered). Fills the buffer, returns the count.</summary>
-        public int CastShape(float3 origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
+        /// every hit (unordered). The proxy points are relative to origin (a world
+        /// <see cref="B3Pos"/>). Fills the buffer, returns the count.</summary>
+        public int CastShape(B3Pos origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
             float3 translation, QueryFilter filter, Span<RayHit> hits)
             => CastShape(origin, proxyPoints, proxyRadius, translation, filter, hits, out _);
 
         /// <summary>As the other <c>CastShape</c>, also reporting broadphase-tree work.</summary>
-        public unsafe int CastShape(float3 origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
+        public unsafe int CastShape(B3Pos origin, ReadOnlySpan<float3> proxyPoints, float proxyRadius,
             float3 translation, QueryFilter filter, Span<RayHit> hits, out TreeStats stats)
         {
             if (proxyPoints.IsEmpty) throw new ArgumentException("proxy needs at least one point", nameof(proxyPoints));

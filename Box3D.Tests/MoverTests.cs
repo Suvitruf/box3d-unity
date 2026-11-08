@@ -52,7 +52,7 @@ namespace Box3D.Tests
 
             Span<CollisionPlane> planes = stackalloc CollisionPlane[8];
             Span<MoverHit> hits = stackalloc MoverHit[8];
-            int count = world.CollideMover(new float3(0f, 0.45f, 0f), MoverCapsule, QueryFilter.Default, planes, hits);
+            int count = world.CollideMover(new B3Pos(0f, 0.45f, 0f), MoverCapsule, QueryFilter.Default, planes, hits);
 
             Assert.Greater(count, 0, "overlapping mover should gather at least one plane");
             bool foundGround = false;
@@ -62,7 +62,7 @@ namespace Box3D.Tests
                 foundGround = true;
                 Assert.AreEqual(groundShape.Id, hits[i].ShapeId, "hit should reference the ground shape");
                 Assert.AreEqual(0.5f, hits[i].Point.y, 0.1f, "closest point should lie on the ground top (y = 0.5)");
-                Assert.Less(math.length(hits[i].Point.xz), 0.5f, "closest point should be under the capsule");
+                Assert.Less(math.length(((float3)hits[i].Point).xz), 0.5f, "closest point should be under the capsule");
             }
             Assert.IsTrue(foundGround, "ground contact should produce an upward-facing plane");
 

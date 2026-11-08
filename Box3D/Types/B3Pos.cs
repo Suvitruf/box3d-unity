@@ -59,6 +59,17 @@ namespace Box3D
 
         public static B3Pos Zero => default;
 
+        /// <summary>Offsets a world position by a float vector (double + float in double mode).</summary>
+        public static B3Pos operator +(B3Pos p, float3 v) => new B3Pos(p.x + v.x, p.y + v.y, p.z + v.z);
+
+        /// <summary>Offsets a world position by a float vector (double - float in double mode).</summary>
+        public static B3Pos operator -(B3Pos p, float3 v) => new B3Pos(p.x - v.x, p.y - v.y, p.z - v.z);
+
+        /// <summary>The offset from <paramref name="b"/> to <paramref name="a"/>, as float. The
+        /// difference is computed at full precision and only then narrowed, so it stays accurate
+        /// for two nearby positions however far they are from the world origin.</summary>
+        public static float3 operator -(B3Pos a, B3Pos b) => new float3((float)(a.x - b.x), (float)(a.y - b.y), (float)(a.z - b.z));
+
         public override string ToString() => $"({x}, {y}, {z})";
     }
 }
