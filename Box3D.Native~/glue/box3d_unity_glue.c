@@ -10,9 +10,13 @@
 //
 // Bump B3U_GLUE_VERSION whenever an export is added or changed; the C# layer probes it at world
 // creation to fail loudly on stale binaries.
+//   1 — b3u_* exports introduced.
+//   2 — b3u_RayHit stores the hit point as b3Pos (full precision in double builds). The single-
+//       precision layout is unchanged, so the C# side only insists on 2 under BOX3D_DOUBLE.
 
 #include <box3d/box3d.h>
 
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -22,7 +26,7 @@
 #define B3U_API __attribute__((visibility("default")))
 #endif
 
-#define B3U_GLUE_VERSION 1
+#define B3U_GLUE_VERSION 2
 
 static b3WorldId b3u_LoadWorldId(uint32_t bits)
 {
@@ -86,18 +90,21 @@ B3U_API void b3u_World_GetJointEvents(uint32_t worldId, const b3JointEvent** joi
 
 // ---------------------------------------------------------------- queries
 
-// Mirrors the C# Box3D.RayHit layout exactly (56 bytes): points/normals stored as floats even in
-// double-precision builds, matching the managed collector's narrowing.
+// Mirrors the C# Box3D.RayHit layout exactly: the hit point is a b3Pos (float in single precision,
+// double in double precision — 56 and 64 bytes respectively); the normal stays float in both.
 typedef struct b3u_RayHit
 {
 	b3ShapeId shapeId;
-	float px, py, pz;
-	float nx, ny, nz;
+	b3Pos point;
+	b3Vec3 normal;
 	float fraction;
 	uint64_t userMaterialId;
 	int32_t triangleIndex;
 	int32_t childIndex;
 } b3u_RayHit;
+
+_Static_assert( sizeof( b3u_RayHit ) == ( sizeof( b3Pos ) == 24 ? 64 : 56 ), "b3u_RayHit must match the C# RayHit layout" );
+_Static_assert( offsetof( b3u_RayHit, userMaterialId ) == ( sizeof( b3Pos ) == 24 ? 48 : 40 ), "b3u_RayHit field offsets must match C#" );
 
 typedef struct b3u_RayCollectorContext
 {
@@ -121,12 +128,8 @@ static float b3u_CastCollector(b3ShapeId shapeId, b3Pos point, b3Vec3 normal, fl
 	if (ctx->count == ctx->capacity) return 0.0f;
 	b3u_RayHit* hit = ctx->buffer + ctx->count;
 	hit->shapeId = shapeId;
-	hit->px = (float)point.x;
-	hit->py = (float)point.y;
-	hit->pz = (float)point.z;
-	hit->nx = normal.x;
-	hit->ny = normal.y;
-	hit->nz = normal.z;
+	hit->point = point;
+	hit->normal = normal;
 	hit->fraction = fraction;
 	hit->userMaterialId = userMaterialId;
 	hit->triangleIndex = triangleIndex;

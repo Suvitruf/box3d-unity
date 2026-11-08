@@ -130,7 +130,7 @@ namespace Box3D.Hybrid.Editor
 
             _grabbed = entry;
             _grabDistance = closest.Fraction * maxDistance;
-            _grabTarget = closest.Point;
+            _grabTarget = (float3)closest.Point; // editor grab works in float (mouse-ray space)
             _grabLocalPoint = entry.Body.GetLocalPoint(closest.Point);
             _restoreAngularDamping = entry.Body.GetAngularDamping();
             entry.Body.SetAngularDamping(Mathf.Max(_restoreAngularDamping, GrabAngularDamping));

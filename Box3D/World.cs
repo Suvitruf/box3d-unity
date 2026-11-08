@@ -11,6 +11,16 @@ namespace Box3D
 
         private static bool _glueProbed;
 
+        // Glue version history (Box3D.Native~/glue/box3d_unity_glue.c):
+        //   1 — b3u_* exports introduced.
+        //   2 — b3u_RayHit stores the hit point as b3Pos. Identical layout in single precision,
+        //       so only double-precision builds (BOX3D_DOUBLE) must insist on it.
+#if BOX3D_DOUBLE
+        private const int RequiredGlueVersion = 2;
+#else
+        private const int RequiredGlueVersion = 1;
+#endif
+
         // The Burst-callable paths (queries, events, body accessors) go through the b3u_* glue
         // exports; a native library built without them would otherwise fail later with a cryptic
         // EntryPointNotFoundException from some Burst call site. Probe once, up front, loudly.
@@ -22,8 +32,8 @@ namespace Box3D
             try
             {
                 int version = BurstBindings.b3u_GlueVersion();
-                if (version < 1)
-                    Debug.LogError($"[Box3D] Native glue version {version} is older than this C# layer expects (1). " +
+                if (version < RequiredGlueVersion)
+                    Debug.LogError($"[Box3D] Native glue version {version} is older than this C# layer expects ({RequiredGlueVersion}). " +
                                    "Rebuild the native plugins with the Box3D.Native~ build scripts.");
             }
             catch (EntryPointNotFoundException)

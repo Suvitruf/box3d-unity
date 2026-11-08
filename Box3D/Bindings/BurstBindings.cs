@@ -17,7 +17,8 @@ namespace Box3D
     /// <para>2. The b3u_* glue exports (Box3D.Native~/glue/box3d_unity_glue.c, compiled into the
     /// native library): pointer-based wrappers for entry points whose signatures pass vectors,
     /// filters or multi-word results by value — those can never be redeclared portably in C#
-    /// (per-ABI sret and HFA conventions). Requires natives built with glue version ≥ 1;
+    /// (per-ABI sret and HFA conventions). Requires natives built with glue version ≥ 1 (≥ 2 under
+    /// <c>BOX3D_DOUBLE</c>, where <c>b3u_RayHit</c> carries a double-precision point);
     /// <see cref="World.Create"/> probes <see cref="b3u_GlueVersion"/> and logs a clear error on
     /// stale binaries.</para>
     ///

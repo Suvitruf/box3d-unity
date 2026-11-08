@@ -49,7 +49,7 @@ namespace Box3D
             ctx->Buffer[ctx->Count] = new RayHit
             {
                 ShapeId = shapeId,
-                Point = (float3)point,
+                Point = point,
                 Normal = normal,
                 Fraction = fraction,
                 UserMaterialId = userMaterialId,
@@ -112,9 +112,7 @@ namespace Box3D
         }
 
         /// <summary>Collects every hit along the ray (unordered). Fills the buffer, returns the
-        /// count. For just the nearest hit use <see cref="CastRayClosest"/>. Note that
-        /// <see cref="RayHit.Point"/> is reported in float even under <c>BOX3D_DOUBLE</c>; the
-        /// closest-hit form returns a full-precision <see cref="B3Pos"/>.</summary>
+        /// count. For just the nearest hit use <see cref="CastRayClosest"/>.</summary>
         public int CastRay(B3Pos origin, float3 translation, QueryFilter filter, Span<RayHit> hits)
             => CastRay(origin, translation, filter, hits, out _);
 
