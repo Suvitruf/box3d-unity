@@ -18,7 +18,11 @@ namespace Box3D
 
         public void Destroy()
         {
-            if (Id.IsNull) return; // double-destroy would pass a null id into unvalidated native paths
+            if (Id.IsNull || !IsValid)
+            {
+                Id = default;
+                return;
+            }
             UnsafeBindings.b3DestroyBody(Id);
             Id = default;
         }

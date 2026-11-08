@@ -41,6 +41,7 @@ namespace Box3D.Hybrid
         private World _world;
         private Body _anchor;
         private static Box3DWorld _instance;
+        private bool _isDuplicate;
 
         /// <summary>The underlying Box3D world (valid after this component is enabled).</summary>
         public World World => _world;
@@ -62,6 +63,7 @@ namespace Box3D.Hybrid
                 if (!_anchor.IsValid)
                 {
                     EnsureCreated();
+                    if (!_world.IsValid) return default;
                     _anchor = _world.CreateBody(BodyDef.Default); // static at origin
                 }
                 return _anchor;
@@ -75,11 +77,17 @@ namespace Box3D.Hybrid
             {
                 if (!_instance)
                 {
-                    _instance = FindAnyObjectByType<Box3DWorld>();
+                    foreach (Box3DWorld candidate in FindObjectsByType<Box3DWorld>(FindObjectsSortMode.None))
+                    {
+                        if (candidate._isDuplicate) continue;
+                        _instance = candidate;
+                        break;
+                    }
                     if (!_instance)
                     {
                         _instance = new GameObject("Box3D World").AddComponent<Box3DWorld>();
                     }
+                    _instance.EnsureCreated();
                 }
                 return _instance;
             }
@@ -90,6 +98,9 @@ namespace Box3D.Hybrid
             if (_instance && _instance != this)
             {
                 Debug.LogWarning("[Box3D] Multiple Box3DWorld components — only the first is used.", this);
+                _isDuplicate = true;
+                enabled = false;
+                return;
             }
             _instance = this;
             EnsureCreated();
@@ -97,7 +108,7 @@ namespace Box3D.Hybrid
 
         private void EnsureCreated()
         {
-            if (_world.IsValid) return;
+            if (_world.IsValid || _isDuplicate || (_instance && _instance != this)) return;
 
             WorldDef def = WorldDef.Default;
             def.Gravity = Gravity;

@@ -5,15 +5,20 @@ commit:   29bf523 (v0.1.0-2-g29bf523, "Fixes 02 (#31)")
 source:   /mnt/e/Projects/box3d (E:\Projects\box3d)
 config:   Release, BUILD_SHARED_LIBS=ON (static for iOS/WebGL), single precision (+ _d double variants)
 
-Shipped binaries (all built from the commit above by the manual GitHub Actions workflow
-.github/workflows/build-natives.yml, precision "both", on 2026-09-01):
-- Windows x64   box3d.dll / box3d_d.dll         Ninja + MSVC 2022
-- Linux x64     libbox3d.so / libbox3d_d.so     ubuntu-latest gcc
+Shipped binaries (all use the commit above; platform build provenance below):
+- Windows x64   box3d.dll / box3d_d.dll         MSVC 2022 19.44, local Release build 2026-09-08 + mesh cleanup fix
+- Linux x64     libbox3d.so / libbox3d_d.so     GCC 13.3, local Release build 2026-09-08 + mesh cleanup fix
 - Android arm64 libbox3d.so / libbox3d_d.so     NDK r27c, API 23, 16 KB-aligned, stripped
 - WebGL (wasm)  libbox3d.a                      Emscripten 3.1.39 == Unity 6000.0's, static (double staged, not shipped)
 - macOS universal libbox3d.dylib / libbox3d_d.dylib  macos-15, universal x86_64+arm64, min macOS 11.0, ad-hoc signed
 - iOS arm64     libbox3d.a                      macos-15, arm64 static, min iOS 13.0; C# side uses
                                                 Box3DLibrary.Name = "__Internal" on iOS (double staged, not shipped)
+
+Android, WebGL, macOS and iOS retain the 2026-09-01 manual GitHub Actions builds
+(.github/workflows/build-natives.yml, precision "both"). Their managed TriangleMesh.Create
+entry point now validates bounds and degenerate/welded-away triangles before native calls.
+All future builds apply the mesh cleanup fix through glue/CMakeLists.txt without editing the
+source checkout. Native API users on the older builds must rebuild to get that cleanup.
 
 Unity glue (glue/box3d_unity_glue.c, b3u_* exports, GLUE VERSION 1): compiled into every binary
 via glue/CMakeLists.txt since 2026-09-01 — the C# Burst paths (queries, events, body accessors)

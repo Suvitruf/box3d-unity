@@ -41,6 +41,12 @@ world.Destroy();   // or destroy the shapes
 mesh.Destroy();    // THEN free the referenced data
 ```
 
+`TriangleMesh.Create` rejects out-of-range indices and non-finite vertices with an argument
+exception. A mesh with no usable triangles (including after welding), or with collision bounds
+outside Box3D's supported range, returns an uncreated owner (`IsCreated == false`). Check that
+result before attaching it to a body. These checks also avoid a mesh failure-path leak in older
+native plugins.
+
 Engine generators exist for quick setups: `TriangleMesh.CreateBox`, `TriangleMesh.CreateGrid`.
 Meshes are one-sided and static-only; per-triangle materials are supported via
 `ShapeDef.Materials`.

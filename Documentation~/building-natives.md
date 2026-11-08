@@ -84,3 +84,22 @@ the `.a` binary and its import settings are needed.
 Box3D enforces deterministic math (`-ffp-contract=off`, custom trig). The build scripts preserve
 those flags — if you build with different toolchains or flags, cross-platform determinism may be
 degraded even though everything still works.
+
+## Mesh cleanup compatibility fix
+
+The wrapper CMake project applies a cleanup fix to a build-local copy of Box3D's `mesh.c`.
+It frees temporary vertex and index arrays when mesh creation fails because the resulting bounds
+are invalid, including meshes whose triangles collapse during welding. The source checkout is
+left untouched. Configuration stops if the expected upstream code no longer matches, so review
+this fix when updating Box3D.
+
+Windows x64 and Linux x64 binaries, in both precision modes, include this fix as of 2026-09-08.
+Other shipped binaries retain their previous builds. `TriangleMesh.Create` validates input before
+calling native code on every platform, including the welding result, to avoid the affected failure
+path on those older binaries. Direct C API consumers must rebuild to get native cleanup.
+
+To run the native regression on a desktop build, configure the wrapper CMake project with
+`-DBOX3D_UNITY_TESTS=ON`, build the `mesh_cleanup_test` target, and run
+`ctest --test-dir <build-directory> --output-on-failure` (add `-C Release` for Visual Studio).
+The test calls the C API directly and checks allocation counts for degenerate, welded-away and
+out-of-bounds meshes.

@@ -62,7 +62,11 @@ namespace Box3D
         /// <summary>Destroys the world and everything in it. All body/shape/joint ids become stale.</summary>
         public void Destroy()
         {
-            if (Id.IsNull) return; // double-destroy would pass a null id into unvalidated native paths
+            if (Id.IsNull || !IsValid)
+            {
+                Id = default;
+                return;
+            }
             ClearCallbackSlots();
             UnsafeBindings.b3DestroyWorld(Id);
             Id = default;

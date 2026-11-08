@@ -136,7 +136,7 @@ namespace Box3D.Hybrid
         /// by lossyScale) would put anchors in the wrong place on a scaled GameObject.</summary>
         protected static float3 ToBodyLocal(Transform body, Vector3 worldPoint)
         {
-            return math.mul(math.inverse((quaternion)body.rotation), (float3)(worldPoint - body.position));
+            return Box3DBody.ToBodyLocal(body, worldPoint);
         }
     }
 }

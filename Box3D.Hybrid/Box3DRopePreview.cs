@@ -13,7 +13,7 @@ namespace Box3D.Hybrid
     internal sealed class Box3DRopePreview : IDisposable
     {
         private readonly Box3DRope _rope;
-        private readonly List<Box3DShape> _replicated = new List<Box3DShape>();
+        private readonly List<DetachedShape> _replicated = new List<DetachedShape>();
         private readonly Vector3[] _nodes;
         private World _world;
         private Body[] _segments;
@@ -30,8 +30,16 @@ namespace Box3D.Hybrid
             worldDef.Gravity = rope.SceneGravity();
             _world = World.Create(worldDef);
 
-            ReplicateScene();
-            BuildChain();
+            try
+            {
+                ReplicateScene();
+                BuildChain();
+            }
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         /// <summary>Node positions of the previewed rope, start to end.</summary>
@@ -69,9 +77,9 @@ namespace Box3D.Hybrid
         public void Dispose()
         {
             if (_world.IsValid) _world.Destroy();
-            foreach (Box3DShape shape in _replicated)
+            foreach (DetachedShape shape in _replicated)
             {
-                if (shape) shape.ReleaseDetachedGeometry();
+                shape.Dispose();
             }
             _replicated.Clear();
         }
@@ -93,8 +101,7 @@ namespace Box3D.Hybrid
                 def.Position = shape.transform.position;
                 def.Rotation = shape.transform.rotation;
                 Body body = _world.CreateBody(def);
-                shape.CreateDetachedShape(body);
-                _replicated.Add(shape);
+                _replicated.Add(shape.CreateDetachedShape(body));
             }
         }
 

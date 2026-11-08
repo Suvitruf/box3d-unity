@@ -56,7 +56,8 @@ Optional — placed automatically the first time a body needs it. Add one explic
 - **Sub Step Count** — solver sub-steps per step (higher = stiffer joints/stacks, slower).
 - **Worker Count** — physics threads; 0 = auto (about half the logical cores).
 
-Only one world is used; a second `Box3DWorld` logs a warning. Selecting the world draws a purple
+Only the first world is used. A second `Box3DWorld` logs a warning and disables itself without
+allocating a native world; bodies loaded later continue to use the first world. Selecting the world draws a purple
 gravity arrow in the Scene view — direction is the gravity vector, length its strength (1 g ≈ 1.5 m).
 
 ## Box3DBody
@@ -81,6 +82,13 @@ Behaves like a Unity component:
   the live body.
 
 ## Shapes
+
+A shape contributes collision only while its component is enabled and its GameObject is active.
+Disabling a shape, including a compound child, removes its native collision and updates body mass.
+Re-enabling builds it from the current Transform and component settings; its native shape ID changes.
+Shapes without a `Box3DBody` release and recreate their private static body as well. Initially
+inactive children do not allocate collision until activated. Disabling only `Box3DBody` preserves
+the native body and shapes, while disabling the GameObject also disables its shape components.
 
 Add a shape component to the *same GameObject* as the body. Material fields live on the shape:
 

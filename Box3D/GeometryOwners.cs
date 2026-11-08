@@ -76,6 +76,19 @@ namespace Box3D
             if (vertices.Length < 3) throw new ArgumentException("a mesh needs at least 3 vertices", nameof(vertices));
             if (triangles.Length < 3 || triangles.Length % 3 != 0)
                 throw new ArgumentException("indices must be a non-empty multiple of 3", nameof(triangles));
+            for (int index = 0; index < vertices.Length; index++)
+            {
+                if (!math.all(math.isfinite(vertices[index])))
+                    throw new ArgumentException("vertices must be finite", nameof(vertices));
+            }
+            for (int index = 0; index < triangles.Length; index++)
+            {
+                if ((uint)triangles[index] >= (uint)vertices.Length)
+                    throw new ArgumentOutOfRangeException(nameof(triangles), "every index must refer to a vertex");
+            }
+            // Older shipped plugins leak their temporary arrays on invalid mesh bounds,
+            // including meshes collapsed by welding. Reject that failure path before P/Invoke.
+            if (!MeshValidation.HasUsableTriangles(vertices, triangles, weldVertices, weldTolerance)) return default;
             fixed (float3* v = vertices)
             fixed (int* i = triangles)
             {

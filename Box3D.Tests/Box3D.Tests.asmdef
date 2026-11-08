@@ -5,7 +5,8 @@
         "Box3D.Runtime",
         "Unity.Mathematics",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Box3D.Hybrid"
     ],
     "includePlatforms": [
         "Editor"
