@@ -7,6 +7,12 @@ namespace Box3D
     {
         public ContactId Id;
 
+        /// <summary>Wraps a contact id — the way back into the wrapper API from ids delivered by
+        /// contact events (e.g. <see cref="ContactBeginTouchEvent.ContactId"/>). Cheap and
+        /// unchecked; test <see cref="IsValid"/>, or use <see cref="World.TryGetContact"/> for the
+        /// validated form.</summary>
+        public Contact(ContactId id) => Id = id;
+
         /// <summary>Contacts are destroyed automatically by simulation and world changes —
         /// always validate ids taken from events before use.</summary>
         public bool IsValid => UnsafeBindings.b3Contact_IsValid(Id);

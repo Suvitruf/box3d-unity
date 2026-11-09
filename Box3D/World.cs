@@ -113,6 +113,17 @@ namespace Box3D
             return joint.IsValid && joint.GetWorld().Equals(Id);
         }
 
+        /// <summary>Resolves a contact id (e.g. from <see cref="ContactBeginTouchEvent"/>) to a live
+        /// wrapper. False if the contact has ended, the id is stale, or it belongs to a different
+        /// world. For ids taken straight from this world's current begin-touch events,
+        /// <c>new Contact(id)</c> is the cheap unchecked path.</summary>
+        public bool TryGetContact(ContactId id, out Contact contact)
+        {
+            contact = new Contact(id);
+            // Contact ids carry a 0-based world index; the native API has no b3Contact_GetWorld.
+            return contact.IsValid && id.World0 + 1 == Id.Index1;
+        }
+
         /// <summary>Advances the simulation. Use a fixed timeStep (e.g. Time.fixedDeltaTime);
         /// 4 sub-steps is the recommended default. Callable from Burst-compiled code (see
         /// <see cref="BurstBindings"/> for why this routes through a primitive redeclaration).</summary>
