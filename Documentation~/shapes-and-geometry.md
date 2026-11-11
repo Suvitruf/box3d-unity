@@ -71,19 +71,79 @@ heightmap, size, and painted holes — see [Components](components.md).
 
 ## Compounds
 
-Bake up to 64K spheres/capsules/hulls into one static shape:
+Bake up to 64K spheres, capsules, hulls, and triangle meshes into one static shape:
 
 ```csharp
 var spheres = new[] { new CompoundSphereInstance { Sphere = ..., Material = SurfaceMaterial.Default } };
 var hulls   = new[] { new CompoundHullInstance { Hull = myHull, Transform = B3Transform.Identity,
                                                  Material = SurfaceMaterial.Default } };
-Compound compound = Compound.Create(spheres, hulls: hulls);
-myHull.Destroy();  // compounds bake their own copy of hull data
+var meshes  = new[] { new CompoundMeshInstance { Mesh = myMesh, Transform = B3Transform.Identity,
+                                                 Scale = new float3(1f, 1f, 1f), // required; negative mirrors
+                                                 Material = SurfaceMaterial.Default } };
+Compound compound = Compound.Create(spheres, hulls: hulls, meshes: meshes);
+myHull.Destroy();  // compounds bake their own copy of hull and mesh data
+myMesh.Destroy();
 body.CreateCompoundShape(ShapeDef.Default, compound);
 ```
 
-The `Compound` itself is referenced by its shapes (destroy shapes first), but the *input* hulls
-are copied during `Create`.
+The `Compound` itself is referenced by its shapes (destroy shapes first), but the *input* hulls and
+meshes are copied during `Create`. Instances that share one `TriangleMesh` share a single baked copy,
+so a forest built from one tree mesh costs one mesh plus a transform per tree. A mesh instance
+carries one material, and its `Scale` must be set (zero is rejected).
+
+### Serialization & streaming
+
+A baked compound is one flat, self-contained blob: child shapes, materials, hull and mesh copies,
+and the culling tree. That blob *is* the streaming format. Bake tiles offline, store the bytes, and
+load them at run time without re-baking: loading validates the blob (an engine-version stamp and
+the length) and fixes up a single internal pointer. Nothing is copied or rebuilt.
+
+```csharp
+// Bake time (editor / build pipeline):
+using (var file = File.Create(path)) compound.WriteTo(file);   // straight from native memory
+byte[] blob = compound.ToArray();                              // or one managed copy, e.g. for an asset
+
+// Run time — pick the entry point that matches where the bytes live:
+Compound tile = Compound.ReadFrom(stream);               // new native buffer, owned by the result
+Compound tile = Compound.FromBytes(textAsset.bytes);     // managed bytes: one copy into a native buffer
+Compound tile = Compound.FromNativeMemory(nativeArray);  // caller-owned native memory: zero-copy
+
+body.CreateCompoundShape(ShapeDef.Default, tile);
+// ... when the region unloads:
+shape.Destroy();
+tile.Destroy();   // frees ReadFrom/FromBytes buffers; after FromNativeMemory it only forgets yours
+```
+
+| Entry point | Copies | Buffer owner | Notes |
+|---|---|---|---|
+| `WriteTo(Stream)` | 0 (see below) | — | the compound stays usable afterwards |
+| `WriteTo(Span<byte>)`, `ToArray()` | 1 | — | for assets or your own containers |
+| `ReadFrom(Stream)` | 0 (see below) | the result | sized from the blob header; data after the blob is left alone |
+| `FromBytes(ReadOnlySpan<byte>)` | 1 | the result | TextAsset / Addressables payloads |
+| `FromNativeMemory(NativeArray<byte>)` | 0 | you | 8-byte aligned, unmoved until the compound and every shape using it are destroyed; one buffer may back several static bodies |
+
+- A blob baked by another engine version (or corrupt data) yields a non-created compound
+  (`IsCreated == false`) rather than an exception; a stream that ends early throws
+  `EndOfStreamException`. Check `IsCreated` in streaming code and rebake stale caches.
+- Serializing temporarily unlinks the compound's tree and relinks it before returning, so do not
+  call `WriteTo` while a world that references the compound is stepping (the usual rule for every
+  call into the engine).
+- **Stream I/O under Unity's Mono.** `MemoryStream` and `UnmanagedMemoryStream` move bytes directly
+  to and from native memory. `FileStream` in Unity's class library has no `Span` overloads, so the
+  base `Stream` stages each call through a pooled buffer. The wrapper reads and writes in 256 KB
+  chunks, which keeps that fallback inside the shared pool (no garbage), but it is one extra memcpy
+  per chunk. For true zero-copy disk streaming, read the file into a `NativeArray<byte>` with
+  Unity's `AsyncReadManager` and hand it to `FromNativeMemory`:
+
+```csharp
+// Zero-copy, asynchronous tile load (unsafe context; Unity.IO.LowLevel.Unsafe + Unity.Collections).
+var bytes = new NativeArray<byte>((int)new FileInfo(path).Length, Allocator.Persistent);
+var command = new ReadCommand { Offset = 0, Size = bytes.Length, Buffer = bytes.GetUnsafePtr() };
+ReadHandle read = AsyncReadManager.Read(path, &command, 1);
+// ... later, once read.Status == ReadStatus.Complete:
+read.Dispose();
+Compound tile = Compound.FromNativeMemory(bytes);   // bytes must outlive tile and its shapes
+```
 
 ## Concave objects
 
@@ -94,10 +154,12 @@ Concavity splits by **static vs. dynamic**, as in every rigid-body engine:
   surface. Mesh shapes only generate contacts against *static* bodies — so this is for the world, not
   for something you push around.
 - **Dynamic (moving) concave objects are built from convex pieces.** A moving body collides using
-  convex shapes only (sphere / capsule / box / hull), so a moving concave object is a **compound of
-  convex parts** — either a baked [`Compound`](#compounds) in the code API, or, in the
-  [component layer](components.md), several shape components under one `Box3DBody` (they merge into
-  one compound collider, mirroring Unity's own multi-collider Rigidbody).
+  convex shapes only (sphere / capsule / box / hull), so a moving concave object is **several convex
+  shapes on one body**: in the code API, several `Create*Shape` calls on the same `Body`; in the
+  [component layer](components.md), several shape components under one `Box3DBody` (they gather
+  into one multi-shape body, mirroring Unity's own multi-collider Rigidbody). The baked
+  [`Compound`](#compounds) is not for this — it is static-only, built for large amounts of level
+  geometry.
 
 There is no built-in convex decomposition: author the convex pieces yourself, or precompute them with
 a tool such as [V-HACD](https://github.com/kmammou/v-hacd) and add one hull per piece.

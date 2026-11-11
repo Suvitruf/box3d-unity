@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using NUnit.Framework;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using Unity.Mathematics;
 
@@ -254,6 +256,246 @@ namespace Box3D.Tests
 
             world.Destroy();
             compound.Destroy();
+        }
+
+        [Test]
+        public void CompoundShape_BakesMeshInstances()
+        {
+            int baseline = UnsafeBindings.b3GetByteCount();
+
+            // A unit box mesh instanced twice (the second one stretched 3× in Y) plus a sphere. The
+            // mesh is destroyed right after baking to prove the compound keeps its own copy.
+            TriangleMesh mesh = TriangleMesh.CreateBox(float3.zero, new float3(0.5f, 0.5f, 0.5f));
+            var meshes = new[]
+            {
+                new CompoundMeshInstance
+                {
+                    Mesh = mesh,
+                    Transform = B3Transform.Identity,
+                    Scale = new float3(1f, 1f, 1f),
+                    Material = SurfaceMaterial.Default,
+                },
+                new CompoundMeshInstance
+                {
+                    Mesh = mesh,
+                    Transform = new B3Transform { Position = new float3(4f, 0f, 0f), Rotation = quaternion.identity },
+                    Scale = new float3(1f, 3f, 1f),
+                    Material = SurfaceMaterial.Default,
+                },
+            };
+            var spheres = new[]
+            {
+                new CompoundSphereInstance
+                {
+                    Sphere = new Sphere { Center = new float3(-4f, 0f, 0f), Radius = 0.5f },
+                    Material = SurfaceMaterial.Default,
+                },
+            };
+
+            Compound compound = Compound.Create(spheres, meshes: meshes);
+            Assert.IsTrue(compound.IsCreated);
+            Assert.AreEqual(3, compound.ChildCount);
+            mesh.Destroy();
+
+            World world = World.Create(WorldDef.Default);
+            Body body = world.CreateBody(BodyDef.Default);
+            Assert.IsTrue(body.CreateCompoundShape(ShapeDef.Default, compound).IsValid);
+            AssertRayHitsTopAt(world, x: -4f, expectedY: 0.5f);
+            AssertRayHitsTopAt(world, x: 0f, expectedY: 0.5f);
+            AssertRayHitsTopAt(world, x: 4f, expectedY: 1.5f);
+            world.Destroy();
+
+            compound.Destroy();
+            Assert.AreEqual(baseline, UnsafeBindings.b3GetByteCount(), "compound memory should return to baseline");
+        }
+
+        [Test]
+        public void CompoundCreate_RejectsUnsetMeshScale()
+        {
+            TriangleMesh mesh = TriangleMesh.CreateBox(float3.zero, new float3(0.5f, 0.5f, 0.5f));
+            var meshes = new[] { new CompoundMeshInstance { Mesh = mesh, Transform = B3Transform.Identity } };
+            Assert.Throws<ArgumentException>(() => Compound.Create(meshes: meshes));
+            mesh.Destroy();
+        }
+
+        [Test]
+        public void Compound_RoundTripsThroughBytes()
+        {
+            Compound baked = BakeSampleCompound();
+            int byteCount = baked.ByteCount;
+            int childCount = baked.ChildCount;
+            Assert.Greater(byteCount, 0);
+            Assert.AreEqual(3, childCount);
+
+            byte[] bytes = baked.ToArray();
+            Assert.AreEqual(byteCount, bytes.Length);
+            AssertSampleCompoundCollides(baked); // serializing must leave the original usable
+            baked.Destroy();
+
+            Compound restored = Compound.FromBytes(bytes);
+            Assert.IsTrue(restored.IsCreated);
+            Assert.AreEqual(byteCount, restored.ByteCount);
+            Assert.AreEqual(childCount, restored.ChildCount);
+            AssertSampleCompoundCollides(restored);
+            restored.Destroy();
+            Assert.IsFalse(restored.IsCreated);
+        }
+
+        [Test]
+        public void Compound_RoundTripsThroughStreams()
+        {
+            Compound baked = BakeSampleCompound();
+            int byteCount = baked.ByteCount;
+            var stream = new MemoryStream();
+            baked.WriteTo(stream);
+            Assert.AreEqual(byteCount, stream.Length);
+            AssertSampleCompoundCollides(baked);
+            stream.WriteByte(0xAB); // trailing data after the blob belongs to the caller
+            baked.Destroy();
+
+            stream.Position = 0;
+            Compound restored = Compound.ReadFrom(new ChunkedStream(stream, chunk: 7)); // forces partial reads
+            Assert.IsTrue(restored.IsCreated);
+            Assert.AreEqual(byteCount, restored.ByteCount);
+            Assert.AreEqual(byteCount, stream.Position, "ReadFrom must stop right after the blob");
+            AssertSampleCompoundCollides(restored);
+            restored.Destroy();
+        }
+
+        [Test]
+        public void Compound_FromNativeMemory_WrapsBufferInPlace()
+        {
+            Compound baked = BakeSampleCompound();
+            var buffer = new NativeArray<byte>(baked.ByteCount + 16, Allocator.Persistent); // slack after the blob
+            Assert.AreEqual(baked.ByteCount, baked.WriteTo(buffer.AsSpan()));
+            baked.Destroy();
+
+            Compound wrapped = Compound.FromNativeMemory(buffer);
+            Assert.IsTrue(wrapped.IsCreated);
+            AssertSampleCompoundCollides(wrapped);
+            Compound instanced = Compound.FromNativeMemory(buffer); // same buffer again: the fixup is idempotent
+            Assert.IsTrue(instanced.IsCreated);
+            AssertSampleCompoundCollides(instanced);
+
+            wrapped.Destroy();
+            instanced.Destroy();
+            Assert.IsTrue(buffer.IsCreated, "Destroy must not free caller-owned memory");
+            buffer.Dispose();
+        }
+
+        [Test]
+        public void Compound_RejectsForeignOrCorruptBytes()
+        {
+            Compound baked = BakeSampleCompound();
+            byte[] bytes = baked.ToArray();
+            baked.Destroy();
+
+            byte[] wrongVersion = (byte[])bytes.Clone();
+            wrongVersion[0] ^= 1;
+            Assert.IsFalse(Compound.FromBytes(wrongVersion).IsCreated);
+            Assert.IsFalse(Compound.ReadFrom(new MemoryStream(wrongVersion)).IsCreated);
+            var wrongVersionNative = new NativeArray<byte>(wrongVersion, Allocator.Temp);
+            Assert.IsFalse(Compound.FromNativeMemory(wrongVersionNative).IsCreated);
+            wrongVersionNative.Dispose();
+
+            Assert.IsFalse(Compound.FromBytes(new ReadOnlySpan<byte>(bytes, 0, bytes.Length - 1)).IsCreated, "declared length exceeds the data");
+            Assert.Throws<ArgumentException>(() => Compound.FromBytes(new byte[8]));
+
+            var truncated = new MemoryStream(bytes, 0, bytes.Length - 1);
+            Assert.Throws<EndOfStreamException>(() => Compound.ReadFrom(truncated)); // seekable: length check up front
+            Assert.Throws<EndOfStreamException>(
+                () => Compound.ReadFrom(new ChunkedStream(new MemoryStream(bytes, 0, bytes.Length - 1), chunk: 64))); // non-seekable: read loop
+        }
+
+        /// <summary>One child of each baked kind, all with their top face at y = 0.5: a sphere at
+        /// x = -4, a box hull at x = 0, and a box mesh at x = 4. The hull and mesh are destroyed right
+        /// away — the compound bakes its own copies.</summary>
+        private static Compound BakeSampleCompound()
+        {
+            var corners = new float3[8];
+            for (int i = 0; i < 8; i++)
+            {
+                corners[i] = new float3((i & 1) == 0 ? -0.5f : 0.5f, (i & 2) == 0 ? -0.5f : 0.5f, (i & 4) == 0 ? -0.5f : 0.5f);
+            }
+            Hull hull = Hull.Create(corners);
+            TriangleMesh mesh = TriangleMesh.CreateBox(float3.zero, new float3(0.5f, 0.5f, 0.5f));
+
+            var spheres = new[]
+            {
+                new CompoundSphereInstance
+                {
+                    Sphere = new Sphere { Center = new float3(-4f, 0f, 0f), Radius = 0.5f },
+                    Material = SurfaceMaterial.Default,
+                },
+            };
+            var hulls = new[]
+            {
+                new CompoundHullInstance { Hull = hull, Transform = B3Transform.Identity, Material = SurfaceMaterial.Default },
+            };
+            var meshes = new[]
+            {
+                new CompoundMeshInstance
+                {
+                    Mesh = mesh,
+                    Transform = new B3Transform { Position = new float3(4f, 0f, 0f), Rotation = quaternion.identity },
+                    Scale = new float3(1f, 1f, 1f),
+                    Material = SurfaceMaterial.Default,
+                },
+            };
+            Compound compound = Compound.Create(spheres, hulls: hulls, meshes: meshes);
+            Assert.IsTrue(compound.IsCreated);
+            hull.Destroy();
+            mesh.Destroy();
+            return compound;
+        }
+
+        /// <summary>Attaches the sample compound to a fresh static body and ray casts each child.</summary>
+        private static void AssertSampleCompoundCollides(Compound compound)
+        {
+            World world = World.Create(WorldDef.Default);
+            Body body = world.CreateBody(BodyDef.Default);
+            Assert.IsTrue(body.CreateCompoundShape(ShapeDef.Default, compound).IsValid);
+            AssertRayHitsTopAt(world, x: -4f, expectedY: 0.5f);
+            AssertRayHitsTopAt(world, x: 0f, expectedY: 0.5f);
+            AssertRayHitsTopAt(world, x: 4f, expectedY: 0.5f);
+            world.Destroy();
+        }
+
+        private static void AssertRayHitsTopAt(World world, float x, float expectedY)
+        {
+            RayResult hit = world.CastRayClosest(new float3(x, 5f, 0f), new float3(0f, -10f, 0f), QueryFilter.Default);
+            Assert.IsTrue(hit.Hit, $"ray at x = {x} should hit");
+            Assert.AreEqual(expectedY, hit.Point.y, 1e-3f, $"hit height at x = {x}");
+        }
+
+        /// <summary>Hands out at most <c>chunk</c> bytes per Read and cannot seek, so a loader must
+        /// loop over partial reads and cannot rely on the stream length.</summary>
+        private sealed class ChunkedStream : Stream
+        {
+            private readonly Stream _inner;
+            private readonly int _chunk;
+
+            public ChunkedStream(Stream inner, int chunk)
+            {
+                _inner = inner;
+                _chunk = chunk;
+            }
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                return _inner.Read(buffer, offset, Math.Min(count, _chunk));
+            }
+
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
     }
 }

@@ -26,8 +26,9 @@ This project was inspired by, and owes its architecture to, two projects:
   damping, per-axis motion locks, bullets/CCD, gravity scale).
 - **Shapes** — sphere, capsule, convex hull (with cylinder/cone/rock/point-cloud builders),
   triangle mesh, height field (buildable straight from a Unity Terrain, painted holes included),
-  compound. Clear, documented geometry lifetime rules. Concave objects: triangle meshes for static
-  geometry, compounds of convex parts for dynamic bodies
+  compound (spheres/capsules/hulls/meshes baked into one static shape, serializable to a flat blob
+  for open-world streaming). Clear, documented geometry lifetime rules. Concave objects: triangle
+  meshes for static geometry, several convex shapes on one body for dynamic objects
   ([details](Documentation~/shapes-and-geometry.md#concave-objects)).
 - **Joints** — all nine box3d joints: distance, motor, filter, parallel, prismatic, revolute,
   spherical (cone/twist limits), weld, wheel (suspension + steering + drive) — each with its full
