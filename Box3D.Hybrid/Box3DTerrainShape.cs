@@ -72,6 +72,13 @@ namespace Box3D.Hybrid
 
         protected override Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
+            return BuildShape(body, localPosition, localRotation, true, out _field);
+        }
+
+        private Shape BuildShape(Body body, float3 localPosition, quaternion localRotation, bool register,
+            out HeightField field)
+        {
+            field = default;
             Terrain terrain = Terrain ? Terrain : GetComponent<Terrain>();
             if (!terrain || !terrain.terrainData)
             {
@@ -125,12 +132,27 @@ namespace Box3D.Hybrid
                 data.size.y,
                 data.size.z / (nz - 1));
 
-            _field = HeightField.Create(heights, nx, nz, fieldScale,
+            field = HeightField.Create(heights, nx, nz, fieldScale,
                 globalMinimumHeight: 0f, globalMaximumHeight: 1f,
                 clockwiseWinding: false, // counter-clockwise = upward-facing surface
                 materialIndices: ApplyHoles ? BuildHoleQuads(data, nx, nz, stride) : null);
-            Shape shape = body.CreateHeightFieldShape(BuildDef(), _field);
-            if (shape.IsValid)
+            if (!field.IsCreated) return default;
+            Shape shape;
+            try
+            {
+                shape = body.CreateHeightFieldShape(BuildDef(), field);
+            }
+            catch
+            {
+                field.Destroy();
+                throw;
+            }
+            if (!shape.IsValid)
+            {
+                field.Destroy();
+                return default;
+            }
+            if (register)
             {
                 _heights = heights;
                 _countX = nx;
@@ -184,9 +206,11 @@ namespace Box3D.Hybrid
         }
 
 #if UNITY_EDITOR
-        // Detached preview shapes stash their HeightField in _field like a live one — free it
-        // the same way once the preview world is gone.
-        internal override void ReleaseDetachedGeometry() => ReleaseGeometry();
+        internal override DetachedShape CreateDetachedShape(Body body, float3 localPosition, quaternion localRotation)
+        {
+            Shape shape = BuildShape(body, localPosition, localRotation, false, out HeightField field);
+            return new DetachedShape(shape) { Field = field };
+        }
 #endif
 
         private void OnDrawGizmosSelected()

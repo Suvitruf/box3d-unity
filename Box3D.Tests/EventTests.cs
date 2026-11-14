@@ -86,6 +86,67 @@ namespace Box3D.Tests
         }
 
         [Test]
+        public void ContactId_FromBeginEvent_ResolvesToLiveContact()
+        {
+            World world = World.Create(WorldDef.Default);
+            World otherWorld = World.Create(WorldDef.Default);
+
+            Body ground = world.CreateBody(BodyDef.Default);
+            BoxHull groundHull = BoxHull.Create(10f, 0.5f, 10f);
+            ShapeDef groundShapeDef = ShapeDef.Default;
+            groundShapeDef.EnableContactEvents = true;
+            Shape groundShape = ground.CreateHullShape(groundShapeDef, in groundHull);
+
+            BodyDef sphereDef = BodyDef.Default;
+            sphereDef.Type = BodyType.Dynamic;
+            sphereDef.Position = new float3(0f, 2f, 0f);
+            Body sphereBody = world.CreateBody(sphereDef);
+            ShapeDef sphereShapeDef = ShapeDef.Default;
+            sphereShapeDef.EnableContactEvents = true;
+            Shape sphereShape = sphereBody.CreateSphereShape(sphereShapeDef, new Sphere { Radius = 0.5f });
+
+            ContactId beginId = default;
+            for (int i = 0; i < 120 && beginId.IsNull; i++)
+            {
+                world.Step(TimeStep);
+                foreach (ContactBeginTouchEvent begin in world.GetContactEvents().Begin)
+                {
+                    beginId = begin.ContactId;
+                }
+            }
+
+            Assert.IsFalse(beginId.IsNull, "a begin-touch event should fire for the sphere/ground pair");
+
+            // Unchecked wrap, same as new Shape(id) / new Body(id).
+            var contact = new Contact(beginId);
+            Assert.IsTrue(contact.IsValid);
+
+            ContactData data = contact.GetData();
+            bool pairMatches =
+                (data.ShapeA == groundShape && data.ShapeB == sphereShape) ||
+                (data.ShapeA == sphereShape && data.ShapeB == groundShape);
+            Assert.IsTrue(pairMatches, "GetData should report the two shapes from the event");
+            Assert.AreEqual(1, data.Manifolds.Length);
+            Assert.Greater(data.Manifolds[0].PointCount, 0);
+
+            // Validated resolution: this world yes, another world no, null id no.
+            Assert.IsTrue(world.TryGetContact(beginId, out Contact resolved));
+            Assert.AreEqual(contact, resolved);
+            Assert.IsFalse(otherWorld.TryGetContact(beginId, out _));
+            Assert.IsFalse(world.TryGetContact(default, out _));
+            Assert.IsFalse(new Contact(default).IsValid);
+
+            // Once the pair separates the contact is destroyed and the stored id goes stale.
+            sphereBody.SetTransform(new float3(0f, 50f, 0f), quaternion.identity);
+            for (int i = 0; i < 3; i++) world.Step(TimeStep);
+            Assert.IsFalse(contact.IsValid);
+            Assert.IsFalse(world.TryGetContact(beginId, out _));
+
+            otherWorld.Destroy();
+            world.Destroy();
+        }
+
+        [Test]
         public void SensorEvents_FireOnEnterAndExit()
         {
             World world = World.Create(WorldDef.Default);

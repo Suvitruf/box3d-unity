@@ -11,6 +11,16 @@ namespace Box3D
 
         private static bool _glueProbed;
 
+        // Glue version history (Box3D.Native~/glue/box3d_unity_glue.c):
+        //   1 — b3u_* exports introduced.
+        //   2 — b3u_RayHit stores the hit point as b3Pos. Identical layout in single precision,
+        //       so only double-precision builds (BOX3D_DOUBLE) must insist on it.
+#if BOX3D_DOUBLE
+        private const int RequiredGlueVersion = 2;
+#else
+        private const int RequiredGlueVersion = 1;
+#endif
+
         // The Burst-callable paths (queries, events, body accessors) go through the b3u_* glue
         // exports; a native library built without them would otherwise fail later with a cryptic
         // EntryPointNotFoundException from some Burst call site. Probe once, up front, loudly.
@@ -22,8 +32,8 @@ namespace Box3D
             try
             {
                 int version = BurstBindings.b3u_GlueVersion();
-                if (version < 1)
-                    Debug.LogError($"[Box3D] Native glue version {version} is older than this C# layer expects (1). " +
+                if (version < RequiredGlueVersion)
+                    Debug.LogError($"[Box3D] Native glue version {version} is older than this C# layer expects ({RequiredGlueVersion}). " +
                                    "Rebuild the native plugins with the Box3D.Native~ build scripts.");
             }
             catch (EntryPointNotFoundException)
@@ -62,7 +72,11 @@ namespace Box3D
         /// <summary>Destroys the world and everything in it. All body/shape/joint ids become stale.</summary>
         public void Destroy()
         {
-            if (Id.IsNull) return; // double-destroy would pass a null id into unvalidated native paths
+            if (Id.IsNull || !IsValid)
+            {
+                Id = default;
+                return;
+            }
             ClearCallbackSlots();
             UnsafeBindings.b3DestroyWorld(Id);
             Id = default;
@@ -97,6 +111,17 @@ namespace Box3D
         {
             joint = new Joint(id);
             return joint.IsValid && joint.GetWorld().Equals(Id);
+        }
+
+        /// <summary>Resolves a contact id (e.g. from <see cref="ContactBeginTouchEvent"/>) to a live
+        /// wrapper. False if the contact has ended, the id is stale, or it belongs to a different
+        /// world. For ids taken straight from this world's current begin-touch events,
+        /// <c>new Contact(id)</c> is the cheap unchecked path.</summary>
+        public bool TryGetContact(ContactId id, out Contact contact)
+        {
+            contact = new Contact(id);
+            // Contact ids carry a 0-based world index; the native API has no b3Contact_GetWorld.
+            return contact.IsValid && id.World0 + 1 == Id.Index1;
         }
 
         /// <summary>Advances the simulation. Use a fixed timeStep (e.g. Time.fixedDeltaTime);

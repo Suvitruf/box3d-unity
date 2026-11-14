@@ -26,7 +26,7 @@ namespace Box3D.Hybrid.Editor
         }
 
         private readonly List<Entry> _entries = new List<Entry>();
-        private readonly List<Box3DShape> _replicated = new List<Box3DShape>();
+        private readonly List<DetachedShape> _replicated = new List<DetachedShape>();
         private World _world;
 
         private Entry _grabbed;
@@ -60,12 +60,20 @@ namespace Box3D.Hybrid.Editor
             worldDef.Gravity = SceneGravity();
             _world = World.Create(worldDef);
 
-            var simulated = new HashSet<Box3DBody>(bodies);
-            foreach (Box3DBody body in bodies)
+            try
             {
-                CreateDynamic(body);
+                var simulated = new HashSet<Box3DBody>(bodies);
+                foreach (Box3DBody body in bodies)
+                {
+                    CreateDynamic(body);
+                }
+                ReplicateStaticScene(simulated);
             }
-            ReplicateStaticScene(simulated);
+            catch
+            {
+                Dispose();
+                throw;
+            }
         }
 
         /// <summary>Advances the simulation one fixed step, pulling the grabbed body first.</summary>
@@ -122,7 +130,7 @@ namespace Box3D.Hybrid.Editor
 
             _grabbed = entry;
             _grabDistance = closest.Fraction * maxDistance;
-            _grabTarget = closest.Point;
+            _grabTarget = (float3)closest.Point; // editor grab works in float (mouse-ray space)
             _grabLocalPoint = entry.Body.GetLocalPoint(closest.Point);
             _restoreAngularDamping = entry.Body.GetAngularDamping();
             entry.Body.SetAngularDamping(Mathf.Max(_restoreAngularDamping, GrabAngularDamping));
@@ -163,9 +171,9 @@ namespace Box3D.Hybrid.Editor
         {
             Release();
             if (_world.IsValid) _world.Destroy();
-            foreach (Box3DShape shape in _replicated)
+            foreach (DetachedShape shape in _replicated)
             {
-                if (shape) shape.ReleaseDetachedGeometry();
+                shape.Dispose();
             }
             _replicated.Clear();
             _entries.Clear();
@@ -192,14 +200,15 @@ namespace Box3D.Hybrid.Editor
             int attached = 0;
             foreach (Box3DShape shape in shapes)
             {
+                if (!shape.isActiveAndEnabled) continue;
                 Transform shapeTransform = shape.transform;
-                float3 localPosition = root.InverseTransformPoint(shapeTransform.position);
+                float3 localPosition = Box3DBody.ToBodyLocal(root, shapeTransform.position);
                 quaternion localRotation = math.mul(bodyInverse, (quaternion)shapeTransform.rotation);
-                Shape created = shape.CreateDetachedShape(body, localPosition, localRotation);
-                _replicated.Add(shape); // its detached geometry is released either way
+                DetachedShape created = shape.CreateDetachedShape(body, localPosition, localRotation);
+                _replicated.Add(created); // its detached geometry is released either way
                 // Only count shapes that actually created (an unreadable mesh fails) — a body
                 // with zero real shapes must not simulate and free-fall through the floor.
-                if (created.IsValid) attached++;
+                if (created.Shape.IsValid) attached++;
             }
 
             if (attached == 0)
@@ -225,8 +234,7 @@ namespace Box3D.Hybrid.Editor
                 def.Position = shape.transform.position;
                 def.Rotation = shape.transform.rotation;
                 Body body = _world.CreateBody(def);
-                shape.CreateDetachedShape(body);
-                _replicated.Add(shape);
+                _replicated.Add(shape.CreateDetachedShape(body));
             }
         }
 

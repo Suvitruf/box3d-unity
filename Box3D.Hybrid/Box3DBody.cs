@@ -122,19 +122,23 @@ namespace Box3D.Hybrid
             GatherHitReceivers(transform, receivers, isRoot: true);
             _hitReceivers = receivers.ToArray();
 
-            quaternion bodyInverse = math.inverse((quaternion)transform.rotation);
-            IntPtr ownerData = GCHandle.ToIntPtr(_handle);
             foreach (Box3DShape shape in _shapes)
             {
-                Transform shapeTransform = shape.transform;
-                float3 localPosition = transform.InverseTransformPoint(shapeTransform.position);
-                quaternion localRotation = math.mul(bodyInverse, shapeTransform.rotation);
-                shape.AttachTo(_body, localPosition, localRotation, shapeTransform.lossyScale,
-                    ownerData, _hitReceivers.Length > 0);
+                AttachShape(shape);
             }
 
             if (Type == Box3DBodyType.Kinematic) _world.AddKinematic(this);
             transform.hasChanged = false;
+        }
+
+        internal void AttachShape(Box3DShape shape)
+        {
+            if (!_body.IsValid) return; // the shape may enable before its owner's Awake
+            Transform shapeTransform = shape.transform;
+            float3 localPosition = ToBodyLocal(transform, shapeTransform.position);
+            quaternion localRotation = math.mul(math.inverse((quaternion)transform.rotation), shapeTransform.rotation);
+            shape.AttachTo(_body, localPosition, localRotation, shapeTransform.lossyScale,
+                this, GCHandle.ToIntPtr(_handle), WantsHits);
         }
 
         private void OnEnable()
@@ -273,6 +277,11 @@ namespace Box3D.Hybrid
             else _world.RemoveKinematic(this);
         }
 #endif
+
+        internal static float3 ToBodyLocal(Transform body, Vector3 worldPoint)
+        {
+            return math.mul(math.inverse((quaternion)body.rotation), (float3)(worldPoint - body.position));
+        }
 
         private static Box3D.BodyType ToNative(Box3DBodyType type)
         {

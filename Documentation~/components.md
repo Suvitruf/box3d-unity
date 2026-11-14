@@ -3,9 +3,9 @@
 > **Young but feature-complete (0.3.x).** A MonoBehaviour layer that lets you author physics in the
 > Inspector instead of writing C#, mirroring Unity's Rigidbody/Collider model: bodies, all six
 > shape types (sphere, box, capsule, hull, mesh, terrain), compound (child) shapes, auto-static
-> colliders, seven joint components, and full inspector/gizmo/handle editing. The API is still
-> settling, so expect some churn. The pointer-level API in the rest of these docs remains the
-> full-featured path. Lives in a separate `Box3D.Hybrid` assembly.
+> colliders, seven joint components, and full inspector/gizmo/handle editing (multi-object editing
+> included). The API is still settling, so expect some churn. The pointer-level API in the rest of
+> these docs remains the full-featured path. Lives in a separate `Box3D.Hybrid` assembly.
 
 If you know Unity's physics components, you already know these:
 
@@ -45,8 +45,10 @@ visual on the same GameObject follows.
 During play, Inspector edits apply to the running simulation immediately: world gravity, body
 type/damping, shape friction/restitution/density, sphere and capsule size (mass is re-derived),
 wind and explosion parameters, and every joint's limits, motor and spring settings. What stays
-fixed on a live object: box/hull/mesh geometry, joint axes/anchors/connected bodies (baked into
-the joint frames at creation), and the world's worker count.
+fixed on a live object: box/hull/mesh geometry and the world's worker count. Joint axes, anchors
+and connected bodies are baked into the joint frames at creation, so the Inspector can't change
+them during play — but the component setters can (`Connected`, `LocalAnchor`, `SetAxis`, …): they
+rebuild the live joint, see [Joints](#joints).
 
 ## Box3DWorld
 
@@ -56,7 +58,8 @@ Optional — placed automatically the first time a body needs it. Add one explic
 - **Sub Step Count** — solver sub-steps per step (higher = stiffer joints/stacks, slower).
 - **Worker Count** — physics threads; 0 = auto (about half the logical cores).
 
-Only one world is used; a second `Box3DWorld` logs a warning. Selecting the world draws a purple
+Only the first world is used. A second `Box3DWorld` logs a warning and disables itself without
+allocating a native world; bodies loaded later continue to use the first world. Selecting the world draws a purple
 gravity arrow in the Scene view — direction is the gravity vector, length its strength (1 g ≈ 1.5 m).
 
 ## Box3DBody
@@ -82,12 +85,31 @@ Behaves like a Unity component:
 
 ## Shapes
 
+A shape contributes collision only while its component is enabled and its GameObject is active.
+Disabling a shape, including a compound child, removes its native collision and updates body mass.
+Re-enabling builds it from the current Transform and component settings; its native shape ID changes.
+Shapes without a `Box3DBody` release and recreate their private static body as well. Initially
+inactive children do not allocate collision until activated. Disabling only `Box3DBody` preserves
+the native body and shapes, while disabling the GameObject also disables its shape components.
+
 Add a shape component to the *same GameObject* as the body. Material fields live on the shape:
 
 - **Density** (kg/m³) — determines mass; baked at creation.
 - **Friction**, **Restitution** (bounciness) — 0–1; changeable at runtime via
   `SetFriction` / `SetRestitution` or the Inspector during play.
 - **Center** — local offset from the body origin (like `Collider.center`).
+
+Every shape exposes its native `Shape` and the `Box3DBody` it is attached to as `AttachedBody`
+(null for a shape that owns a private static body). To go the other way — from a query result or
+an event back to the components — use `Box3DWorld.TryGetShape(id, out Box3DShape shape)` and
+`Box3DWorld.TryGetBody(id, out Box3DBody body)`, the twins of `RaycastHit.collider` and
+`RaycastHit.rigidbody`:
+
+```csharp
+Box3DWorld.Instance.World.CastRayClosest(origin, direction * range, QueryFilter.Default, out RayResult hit);
+if (hit.Hit && Box3DWorld.TryGetBody(hit.ShapeId, out Box3DBody body))
+    Debug.Log($"hit {body.name} at {(Vector3)hit.Point}");
+```
 
 Restitution notes that match the engine, not the component:
 
@@ -124,6 +146,14 @@ static geometry).
 Add a joint component to a GameObject that has a `Box3DBody`; it constrains that body to a
 **Connected Body** (or to the world, if left null — like Unity's null connectedBody). The **Anchor**
 is the local pivot point.
+
+Axes, anchors and the connected body are baked into the joint frames when the joint is created
+(Start), so the Inspector can't change them during play. From code they can: `Connected`,
+`LocalAnchor` and the per-joint axis setters (`SetAxis`, `SetConnectedAnchor`, `Configure`) rebuild
+the native joint at the bodies' *current* poses, so nothing snaps. `Rebuild()` does the same after
+several changes, and brings back a joint box3d removed when its connected body was destroyed. The
+native joint is `Joint` — re-read it after a rebuild rather than caching it. `CollidesWithConnected`
+applies to the live joint immediately.
 
 | Component | Unity analog | Notes |
 |---|---|---|
@@ -230,4 +260,5 @@ with naturally resting objects.
   shapes read mesh vertices at runtime, so the mesh asset must have **Read/Write enabled**.
 
 For anything beyond this, drop to the code API ([getting started](getting-started.md)) — the
-components and the API share the same world and interoperate (`Box3DBody.Body`, `Box3DWorld.World`).
+components and the API share the same world and interoperate (`Box3DBody.Body`, `Box3DShape.Shape`,
+`Box3DJoint.Joint`, `Box3DWorld.World`).

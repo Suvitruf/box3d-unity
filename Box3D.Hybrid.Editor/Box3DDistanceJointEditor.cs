@@ -4,6 +4,7 @@ using UnityEngine;
 namespace Box3D.Hybrid.Editor
 {
     [CustomEditor(typeof(Box3DDistanceJoint))]
+    [CanEditMultipleObjects]
     public class Box3DDistanceJointEditor : Box3DJointEditor
     {
         public override void OnInspectorGUI()
@@ -21,16 +22,15 @@ namespace Box3D.Hybrid.Editor
             base.OnSceneGUI(); // the anchor on this body
 
             // The connected anchor: on the connected body if any, otherwise a world point.
-            var joint = (Box3DDistanceJoint)target;
-            SerializedProperty connected = Property("ConnectedBody");
-            var connectedBody = connected.objectReferenceValue as Box3DBody;
+            SerializedObject joint = SceneTarget;
+            var connectedBody = SceneProperty("ConnectedBody").objectReferenceValue as Box3DBody;
             if (connectedBody)
             {
                 DrawAnchorHandle("ConnectedAnchor", connectedBody.transform, new Color(1f, 0.6f, 0.2f));
             }
             else
             {
-                SerializedProperty anchor = Property("ConnectedAnchor");
+                SerializedProperty anchor = SceneProperty("ConnectedAnchor");
                 EditorGUI.BeginChangeCheck();
                 Handles.color = new Color(1f, 0.6f, 0.2f);
                 float size = HandleUtility.GetHandleSize(anchor.vector3Value) * 0.12f;
@@ -39,7 +39,7 @@ namespace Box3D.Hybrid.Editor
                 {
                     Undo.RecordObject(target, "Move Connected Anchor");
                     anchor.vector3Value = moved;
-                    serializedObject.ApplyModifiedProperties();
+                    joint.ApplyModifiedProperties();
                 }
             }
         }

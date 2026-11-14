@@ -34,12 +34,14 @@ namespace Box3D
     }
 
     /// <summary>One hit from an all-hits ray or shape cast (wrapper-defined container, filled by
-    /// the query collectors — not a native mirror).</summary>
+    /// the query collectors — not a native mirror, but the Burst glue's <c>b3u_RayHit</c> mirrors
+    /// THIS layout: 56 bytes in single precision, 64 under <c>BOX3D_DOUBLE</c>). The hit point is a
+    /// world position and keeps full precision in double mode.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct RayHit
     {
         public ShapeId ShapeId;
-        public float3 Point;
+        public B3Pos Point;
         public float3 Normal;
         public float Fraction;
         public ulong UserMaterialId;

@@ -3,6 +3,7 @@ using UnityEditor;
 namespace Box3D.Hybrid.Editor
 {
     [CustomEditor(typeof(Box3DSliderJoint))]
+    [CanEditMultipleObjects]
     public class Box3DSliderJointEditor : Box3DJointEditor
     {
         public override void OnInspectorGUI()

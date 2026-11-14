@@ -37,6 +37,12 @@ builds Release, and copies the result into `Plugins/`. A binary built without th
 but `World.Create` logs a stale-glue error and the Burst-routed calls throw. If a script can't find
 something it exits with a message naming the variable to set.
 
+**Linux glibc baseline.** A Linux `.so` binds to the glibc symbol versions of the machine that
+linked it and refuses to load on anything older (`version 'GLIBC_2.43' not found`). Build on
+Ubuntu 22.04 or 24.04: the CI workflow builds inside an `ubuntu:22.04` container (glibc 2.35, the
+oldest Linux that Unity 6 players support) and fails the job if the result needs a newer symbol
+version. To check a binary: `objdump -T libbox3d.so | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1`.
+
 ## Double-precision variant
 
 Every build script also produces the opt-in [double-precision](double-precision.md) library when
@@ -53,7 +59,15 @@ BOX3D_DOUBLE=1 bash build_linux.sh     # → Plugins/Linux/x86_64/libbox3d_d.so
 ```
 
 The `build-natives` CI workflow has a matching `precision` input (`single` / `double` / `both`,
-default `both`) and builds the same outputs on every platform in one run.
+default `both`) and builds the same outputs on every platform in one run. With its `commit` input
+on (the default) a final job merges every platform's binaries into `Plugins/` and pushes one
+commit to the branch the workflow was started from; the binaries are also kept as run artifacts.
+The iOS/WebGL double archives only ever ship inside those artifacts (their staging folder is
+gitignored). The job is skipped when any platform fails, so a partial set is never committed, and
+binaries that come out byte-identical to the checked-in ones are not committed either. The builds
+are reproducible so that this holds: clang and gcc output already is, and the Windows DLL links
+with `/Brepro` (set in `glue/CMakeLists.txt`) because `link.exe` otherwise stamps the build time
+into the PE header and export table.
 
 ## WebGL specifics
 
@@ -84,3 +98,22 @@ the `.a` binary and its import settings are needed.
 Box3D enforces deterministic math (`-ffp-contract=off`, custom trig). The build scripts preserve
 those flags — if you build with different toolchains or flags, cross-platform determinism may be
 degraded even though everything still works.
+
+## Mesh cleanup compatibility fix
+
+The wrapper CMake project applies a cleanup fix to a build-local copy of Box3D's `mesh.c`.
+It frees temporary vertex and index arrays when mesh creation fails because the resulting bounds
+are invalid, including meshes whose triangles collapse during welding. The source checkout is
+left untouched. Configuration stops if the expected upstream code no longer matches, so review
+this fix when updating Box3D.
+
+Every shipped binary includes this fix as of 2026-11-08 (Windows and Linux since 2026-09-08).
+`TriangleMesh.Create` additionally validates input before calling native code on every platform,
+including the welding result. Direct C API consumers building Box3D themselves get the fix by
+building through this CMake project.
+
+To run the native regression on a desktop build, configure the wrapper CMake project with
+`-DBOX3D_UNITY_TESTS=ON`, build the `mesh_cleanup_test` target, and run
+`ctest --test-dir <build-directory> --output-on-failure` (add `-C Release` for Visual Studio).
+The test calls the C API directly and checks allocation counts for degenerate, welded-away and
+out-of-bounds meshes.

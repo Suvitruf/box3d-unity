@@ -8,15 +8,16 @@ namespace Box3D.Hybrid.Editor
     /// <summary>Water inspector: the normal fields plus environment checks (compute support, an
     /// SRP with depth/opaque textures), a live particle readout and Fill / Splash / Clear buttons
     /// for testing in play mode. Scene view shows resizable handles for the fill volume (cyan)
-    /// and the simulation bounds (blue).</summary>
+    /// and the simulation bounds (blue). Multi-object editing: fields and buttons apply to every
+    /// selected water, the particle count is the total, and each handle resizes its own water
+    /// (OnSceneGUI runs once per selected object, on that object's SerializedObject).</summary>
     [CustomEditor(typeof(Box3DWater))]
+    [CanEditMultipleObjects]
     public class Box3DWaterEditor : UnityEditor.Editor
     {
         private readonly BoxBoundsHandle _volumeHandle = new BoxBoundsHandle();
         private readonly BoxBoundsHandle _boundsHandle = new BoxBoundsHandle();
-
-        private SerializedProperty _volumeProp;
-        private SerializedProperty _boundsProp;
+        private readonly TargetSerializedObjects _waters = new TargetSerializedObjects();
 
         // Pipeline-flag results cached with a 1 s refresh: reading them is reflection
         // (GetProperty + GetValue), and the inspector runs two passes per repaint.
@@ -24,10 +25,9 @@ namespace Box3D.Hybrid.Editor
         private bool _depthTextureOff;
         private bool _opaqueTextureOff;
 
-        private void OnEnable()
+        private void OnDisable()
         {
-            _volumeProp = serializedObject.FindProperty("VolumeSize");
-            _boundsProp = serializedObject.FindProperty("BoundsSize");
+            _waters.Dispose();
         }
 
         public override void OnInspectorGUI()
@@ -60,23 +60,34 @@ namespace Box3D.Hybrid.Editor
 
             DrawDefaultInspector();
 
-            var water = (Box3DWater)target;
             EditorGUILayout.Space();
             if (Application.isPlaying)
             {
-                EditorGUILayout.LabelField("Particles", water.ActiveParticleRange.ToString("N0"));
+                int particles = 0;
+                foreach (Object t in targets) particles += ((Box3DWater)t).ActiveParticleRange;
+                EditorGUILayout.LabelField("Particles", particles.ToString("N0"));
             }
             using (new EditorGUI.DisabledScope(!Application.isPlaying))
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    if (GUILayout.Button(Application.isPlaying ? "Fill" : "Fill (enter Play mode)")) water.Fill();
+                    if (GUILayout.Button(Application.isPlaying ? "Fill" : "Fill (enter Play mode)"))
+                    {
+                        foreach (Object t in targets) ((Box3DWater)t).Fill();
+                    }
                     if (GUILayout.Button("Splash"))
                     {
-                        water.SpawnParticles(water.transform.position + Vector3.up * 2f, 0.5f,
-                            Vector3.down * 4f, 512);
+                        foreach (Object t in targets)
+                        {
+                            var water = (Box3DWater)t;
+                            water.SpawnParticles(water.transform.position + Vector3.up * 2f, 0.5f,
+                                Vector3.down * 4f, 512);
+                        }
                     }
-                    if (GUILayout.Button("Clear")) water.Clear();
+                    if (GUILayout.Button("Clear"))
+                    {
+                        foreach (Object t in targets) ((Box3DWater)t).Clear();
+                    }
                 }
             }
         }
@@ -91,9 +102,9 @@ namespace Box3D.Hybrid.Editor
         private void OnSceneGUI()
         {
             var water = (Box3DWater)target;
-            serializedObject.Update();
-            SerializedProperty volume = _volumeProp;
-            SerializedProperty bounds = _boundsProp;
+            SerializedObject waterObject = _waters.Update(target);
+            SerializedProperty volume = _waters.Property(target, "VolumeSize");
+            SerializedProperty bounds = _waters.Property(target, "BoundsSize");
 
             // Fill volume: local, rotates with the object.
             _volumeHandle.center = Vector3.zero;
@@ -106,7 +117,7 @@ namespace Box3D.Hybrid.Editor
                 if (EditorGUI.EndChangeCheck())
                 {
                     volume.vector3Value = _volumeHandle.size;
-                    serializedObject.ApplyModifiedProperties();
+                    waterObject.ApplyModifiedProperties();
                 }
             }
 
@@ -119,7 +130,7 @@ namespace Box3D.Hybrid.Editor
             if (EditorGUI.EndChangeCheck())
             {
                 bounds.vector3Value = _boundsHandle.size;
-                serializedObject.ApplyModifiedProperties();
+                waterObject.ApplyModifiedProperties();
             }
         }
     }

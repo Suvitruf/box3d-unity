@@ -27,10 +27,11 @@ namespace Box3D.Hybrid
 
         private DistanceJoint _distance;
 
-        /// <summary>Sets the connected anchor (world space if no connected body). Before Start.</summary>
+        /// <summary>Sets the connected anchor (world space if no connected body); rebuilds a live joint.</summary>
         public void SetConnectedAnchor(Vector3 anchor)
         {
             ConnectedAnchor = anchor;
+            Rebuild();
         }
 
         /// <summary>Sets the rest length (0 = auto). Before Start.</summary>

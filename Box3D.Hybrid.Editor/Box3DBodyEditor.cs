@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEditor;
 using UnityEngine;
@@ -6,8 +7,11 @@ namespace Box3D.Hybrid.Editor
 {
     /// <summary>Body inspector: the normal fields, a live read-out (awake, mass, speed) while playing,
     /// and a Contact Inspector — the body's live contacts (other body, points, separation, impulse)
-    /// listed in the Inspector and drawn in the Scene view (points + normals, colored by impulse).</summary>
+    /// listed in the Inspector and drawn in the Scene view (points + normals, colored by impulse).
+    /// Fields support multi-object editing; the read-out and the contact list describe one body,
+    /// so they show for a single selection only (the Scene drawing covers every selected body).</summary>
     [CustomEditor(typeof(Box3DBody))]
+    [CanEditMultipleObjects]
     public class Box3DBodyEditor : UnityEditor.Editor
     {
         // Impulse (N·s) that maps to a full-red / long-normal contact; contacts above this saturate.
@@ -16,10 +20,11 @@ namespace Box3D.Hybrid.Editor
         private static bool _showContacts = true;
         private static bool _drawInScene = true;
 
-        // Per-frame snapshot: the inspector runs two IMGUI passes per repaint and the scene view
-        // fires several events per frame — fetch contacts (and the scene body list for name
-        // resolution) once per frame instead of once per pass.
-        private ContactData[] _contacts;
+        // Per-frame snapshot, per body (OnSceneGUI runs once per selected body): the inspector
+        // runs two IMGUI passes per repaint and the scene view fires several events per frame —
+        // fetch contacts (and the scene body list for name resolution) once per frame instead of
+        // once per pass.
+        private readonly Dictionary<Body, ContactData[]> _contacts = new Dictionary<Body, ContactData[]>();
         private Box3DBody[] _sceneBodies;
         private int _snapshotFrame = -1;
 
@@ -28,10 +33,15 @@ namespace Box3D.Hybrid.Editor
             if (_snapshotFrame != Time.frameCount)
             {
                 _snapshotFrame = Time.frameCount;
-                _contacts = body.GetContacts();
+                _contacts.Clear();
                 _sceneBodies = null; // refreshed lazily, only if names are actually shown
             }
-            return _contacts;
+            if (!_contacts.TryGetValue(body, out ContactData[] contacts))
+            {
+                contacts = body.GetContacts();
+                _contacts[body] = contacts;
+            }
+            return contacts;
         }
 
         private Box3DBody[] SceneBodies()
@@ -43,7 +53,7 @@ namespace Box3D.Hybrid.Editor
         {
             DrawDefaultInspector();
 
-            if (!Application.isPlaying) return;
+            if (!Application.isPlaying || targets.Length > 1) return;
 
             var component = (Box3DBody)target;
             Body body = component.Body;

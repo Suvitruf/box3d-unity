@@ -5,8 +5,9 @@ namespace Box3D.Hybrid
 {
     /// <summary>Base class for joint components, analogous to Unity's joints. Goes on a GameObject
     /// that has a <see cref="Box3DBody"/> (the constrained body); connects it to another
-    /// <see cref="ConnectedBody"/>, or to the world if that is null. The joint is created after all
-    /// bodies exist (Start), so both endpoints are ready.</summary>
+    /// <see cref="Connected"/> body, or to the world if that is null. The joint is created after all
+    /// bodies exist (Start), so both endpoints are ready; <see cref="Connected"/>,
+    /// <see cref="LocalAnchor"/> and the per-joint axis setters <see cref="Rebuild"/> it afterwards.</summary>
     [RequireComponent(typeof(Box3DBody))]
     public abstract class Box3DJoint : MonoBehaviour
     {
@@ -20,6 +21,8 @@ namespace Box3D.Hybrid
         private bool CollideConnected;
 
         private Joint _joint;
+        private Box3DBody _self;
+        private bool _started;
 
         /// <summary>The world owning this joint (valid after Start).</summary>
         protected Box3DWorld World { get; private set; }
@@ -27,27 +30,87 @@ namespace Box3D.Hybrid
         /// <summary>The joint pivot in world space.</summary>
         protected Vector3 WorldAnchor => transform.TransformPoint(Anchor);
 
-        /// <summary>Sets the connected body (null = world). Must be set before the joint is created
-        /// (Start).</summary>
-        public void SetConnectedBody(Box3DBody body)
+        /// <summary>The underlying Box3D joint (valid between Start and OnDestroy). <see cref="Rebuild"/>
+        /// replaces it, so re-read this after changing a baked property rather than caching it.</summary>
+        public Joint Joint => _joint;
+
+        /// <summary>The body this joint connects to; null = the world (a fixed point), like Unity's
+        /// null connectedBody. Setting it on a live joint rebuilds the joint at the bodies' current
+        /// poses — every assignment does, so set it when something changes, not every frame.</summary>
+        public Box3DBody Connected
         {
-            ConnectedBody = body;
+            get => ConnectedBody;
+            set
+            {
+                ConnectedBody = value;
+                Rebuild();
+            }
         }
 
-        /// <summary>Sets the local anchor point. Must be set before the joint is created (Start).</summary>
-        public void SetAnchor(Vector3 localAnchor)
+        /// <summary>The joint pivot on this body, in local space. Setting it on a live joint rebuilds
+        /// the joint (every assignment does).</summary>
+        public Vector3 LocalAnchor
         {
-            Anchor = localAnchor;
+            get => Anchor;
+            set
+            {
+                Anchor = value;
+                Rebuild();
+            }
         }
+
+        /// <summary>Whether the two connected bodies may collide with each other. Applies to a live
+        /// joint immediately (turning it off also removes any contact between them).</summary>
+        public bool CollidesWithConnected
+        {
+            get => CollideConnected;
+            set
+            {
+                CollideConnected = value;
+                if (_joint.IsValid) _joint.SetCollideConnected(value);
+            }
+        }
+
+        /// <summary>Sets the connected body — see <see cref="Connected"/>.</summary>
+        public void SetConnectedBody(Box3DBody body) => Connected = body;
+
+        /// <summary>Sets the local anchor point — see <see cref="LocalAnchor"/>.</summary>
+        public void SetAnchor(Vector3 localAnchor) => LocalAnchor = localAnchor;
 
         private void Start()
         {
             World = Box3DWorld.Instance;
+            _self = GetComponent<Box3DBody>();
+            _started = true;
+            CreateNativeJoint();
+        }
 
-            Box3DBody self = GetComponent<Box3DBody>();
-            BodyId bodyB = self.Body.Id;
+        /// <summary>Destroys the native joint and creates it again from the current fields, with the
+        /// joint frames taken from the bodies' current poses (so nothing snaps). The setters of the
+        /// baked properties — <see cref="Connected"/>, <see cref="LocalAnchor"/>, a joint's axis —
+        /// call this for you; call it yourself after changing several of them at once, or to bring
+        /// back a joint box3d removed when its connected body was destroyed. A no-op before Start,
+        /// which creates the joint from the fields anyway.</summary>
+        public void Rebuild()
+        {
+            if (!_started) return;
+            if (_joint.IsValid) _joint.Destroy();
+            CreateNativeJoint();
+        }
+
+        private void CreateNativeJoint()
+        {
+            _joint = default;
+            if (!World || !_self || !_self.Body.IsValid) return; // world or body already torn down
+            if (ConnectedBody && !ConnectedBody.Body.IsValid)
+            {
+                Debug.LogWarning($"[Box3D] {name}: connected body '{ConnectedBody.name}' has no live Box3D body " +
+                                 "(inactive, or not yet awake) — the joint is not created. Call Rebuild() once it has one.", this);
+                return;
+            }
+
+            BodyId bodyB = _self.Body.Id;
             BodyId bodyA = ConnectedBody ? ConnectedBody.Body.Id : World.WorldAnchor.Id;
-
             _joint = CreateJoint(bodyA, bodyB);
 
             // box3d sets the collide-connected flag at joint creation but does NOT clear a contact
@@ -119,9 +182,6 @@ namespace Box3D.Hybrid
             return Quaternion.FromToRotation(fromLocal, localAxis.sqrMagnitude > 1e-8f ? localAxis.normalized : fromLocal);
         }
 
-        /// <summary>The connected body (null = world), for joints that place two distinct anchors.</summary>
-        protected Box3DBody Connected => ConnectedBody;
-
         /// <summary>Whether connected bodies are allowed to collide.</summary>
         protected bool Collides => CollideConnected;
 
@@ -136,7 +196,7 @@ namespace Box3D.Hybrid
         /// by lossyScale) would put anchors in the wrong place on a scaled GameObject.</summary>
         protected static float3 ToBodyLocal(Transform body, Vector3 worldPoint)
         {
-            return math.mul(math.inverse((quaternion)body.rotation), (float3)(worldPoint - body.position));
+            return Box3DBody.ToBodyLocal(body, worldPoint);
         }
     }
 }

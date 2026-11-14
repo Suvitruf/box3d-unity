@@ -9,8 +9,11 @@ namespace Box3D.Hybrid.Editor
     /// world with the scene frozen as static collision, so the rope hangs over geometry exactly as
     /// it will in play mode — and **Bake Current Shape** captures that. **Simulate in Editor**
     /// animates the same simulation live (drag an endpoint and the rope follows); **Make Dynamic**
-    /// reverts a bake. When End Point is empty the far end gets a draggable handle.</summary>
+    /// reverts a bake. When End Point is empty the far end gets a draggable handle. Fields support
+    /// multi-object editing; the preview, the editor simulation, baking and the end handle are
+    /// single-rope tools (one preview world per editor) and step aside for a multi-selection.</summary>
     [CustomEditor(typeof(Box3DRope))]
+    [CanEditMultipleObjects]
     public class Box3DRopeEditor : UnityEditor.Editor
     {
         private Box3DRopePreview _simulation;
@@ -21,6 +24,7 @@ namespace Box3D.Hybrid.Editor
         private double _nextDrapeTime;
 
         private Box3DRope Rope => (Box3DRope)target;
+        private bool SingleRope => targets.Length == 1;
 
         private void OnEnable()
         {
@@ -50,6 +54,13 @@ namespace Box3D.Hybrid.Editor
 
             if (Application.isPlaying) return;
             EditorGUILayout.Space();
+
+            if (!SingleRope)
+            {
+                EditorGUILayout.HelpBox("Preview, editor simulation and baking work on a single selected rope.",
+                    MessageType.None);
+                return;
+            }
 
             if (Rope.CurrentMode == Box3DRope.RopeMode.Dynamic)
             {
@@ -93,7 +104,7 @@ namespace Box3D.Hybrid.Editor
 
         private void OnSceneGUI()
         {
-            if (Application.isPlaying) return;
+            if (Application.isPlaying || !SingleRope) return;
 
             // A draggable far-end handle when no End Point transform is assigned.
             SerializedProperty endPoint = serializedObject.FindProperty("EndPoint");
@@ -159,7 +170,7 @@ namespace Box3D.Hybrid.Editor
         {
             // While the live editor simulation runs it owns the preview world — a second
             // Box3DRopePreview here would detach scene geometry twice and leak the first copy.
-            if (_simulating || !Rope || Application.isPlaying) return;
+            if (_simulating || !SingleRope || !Rope || Application.isPlaying) return;
             _lastStart = Rope.StartWorld;
             _lastEnd = Rope.EndWorld;
 

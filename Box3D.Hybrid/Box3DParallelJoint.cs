@@ -22,13 +22,13 @@ namespace Box3D.Hybrid
 
         private ParallelJoint _parallel;
 
-        /// <summary>Configures the joint for runtime assembly (before Start).</summary>
+        /// <summary>Configures the joint for runtime assembly; rebuilds a live joint once.</summary>
         public void Configure(Box3DBody connected, Vector3 axisLocal, float hertz, float dampingRatio)
         {
-            SetConnectedBody(connected);
             Axis = axisLocal;
             Hertz = hertz;
             DampingRatio = dampingRatio;
+            Connected = connected; // last: its setter rebuilds a live joint with everything above
         }
 
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)

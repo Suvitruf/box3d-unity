@@ -47,6 +47,7 @@ namespace Box3D.Tests
             AssertSize<BodyDef>(120);
             AssertSize<BodyMoveEvent>(64);
             AssertSize<RayResult>(80);
+            AssertSize<RayHit>(64); // wrapper-defined, but mirrored by the glue's b3u_RayHit
             AssertSize<ExplosionDef>(48);
             AssertSize<ContactHitEvent>(88);
 #else
@@ -55,6 +56,7 @@ namespace Box3D.Tests
             AssertSize<BodyDef>(104);
             AssertSize<BodyMoveEvent>(48);
             AssertSize<RayResult>(64);
+            AssertSize<RayHit>(56); // wrapper-defined, but mirrored by the glue's b3u_RayHit
             AssertSize<ExplosionDef>(32);
             AssertSize<ContactHitEvent>(72);
 #endif

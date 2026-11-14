@@ -23,6 +23,13 @@ namespace Box3D.Hybrid
 
         protected override Shape CreateShape(Body body, float3 localPosition, quaternion localRotation, float3 scale)
         {
+            return BuildShape(body, localPosition, localRotation, scale, out _mesh);
+        }
+
+        private Shape BuildShape(Body body, float3 localPosition, quaternion localRotation, float3 scale,
+            out TriangleMesh mesh)
+        {
+            mesh = default;
             if (!Mesh)
             {
                 Debug.LogError($"[Box3D] {name}: Box3DMeshShape has no mesh assigned.", this);
@@ -51,8 +58,19 @@ namespace Box3D.Hybrid
                 points[i] = localPosition + math.mul(localRotation, ((float3)vertices[i] + LocalCenter) * scale);
             }
 
-            _mesh = TriangleMesh.Create(points, triangles);
-            return body.CreateMeshShape(BuildDef(), _mesh);
+            mesh = TriangleMesh.Create(points, triangles);
+            if (!mesh.IsCreated) return default;
+            try
+            {
+                Shape shape = body.CreateMeshShape(BuildDef(), mesh);
+                if (!shape.IsValid) mesh.Destroy();
+                return shape;
+            }
+            catch
+            {
+                mesh.Destroy();
+                throw;
+            }
         }
 
         // True crater collision from the dented vertices, reusing the visual mesh's topology.
@@ -73,7 +91,7 @@ namespace Box3D.Hybrid
             TriangleMesh rebuilt = TriangleMesh.Create(points, triangles);
             if (!rebuilt.IsCreated) return default;
 
-            Shape shape = AttachedBody.CreateMeshShape(BuildDef(), rebuilt);
+            Shape shape = AttachedNativeBody.CreateMeshShape(BuildDef(), rebuilt);
             if (!shape.IsValid)
             {
                 rebuilt.Destroy();
@@ -97,9 +115,11 @@ namespace Box3D.Hybrid
         }
 
 #if UNITY_EDITOR
-        // The detached preview shape stored its TriangleMesh in _mesh like a live one — free it
-        // the same way once the preview world is gone.
-        internal override void ReleaseDetachedGeometry() => ReleaseGeometry();
+        internal override DetachedShape CreateDetachedShape(Body body, float3 localPosition, quaternion localRotation)
+        {
+            Shape shape = BuildShape(body, localPosition, localRotation, transform.lossyScale, out TriangleMesh mesh);
+            return new DetachedShape(shape) { Mesh = mesh };
+        }
 #endif
 
         private void OnDrawGizmosSelected()

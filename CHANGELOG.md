@@ -1,5 +1,59 @@
 # Changelog
 
+## [0.8.3] — 2026-11-14
+
+Compound mesh instances and serialization, component lookup and live joint rebuilding, plus
+fixes for collider lifetimes, editor previews, double precision and native compatibility.
+
+### Added
+- **Compound mesh instances** — `Compound.Create` accepts `CompoundMeshInstance` entries with
+  transforms, nonzero scale (including mirroring) and a material. Repeated instances of the same
+  mesh share one baked copy; input hulls and meshes can be destroyed after baking.
+- **Compound serialization and streaming** — `ByteCount`, `WriteTo(Stream)` / `WriteTo(Span<byte>)`,
+  `ToArray`, `ReadFrom`, `FromBytes` and `FromNativeMemory` save and restore baked compounds without
+  rebuilding geometry. Native-memory loading supports caller-owned buffers without copying;
+  deserialized buffers owned by the wrapper are freed by `Destroy`.
+- **Component lookup from query/event IDs** — `Box3DWorld.TryGetShape` and `TryGetBody` resolve a
+  `ShapeId` back to its Unity components. Shapes expose `Shape` and `AttachedBody`; joints expose
+  their native `Joint`.
+- **Live joint rebuilding** — changing connected bodies, anchors or axes through component setters
+  rebuilds the native joint at the bodies' current poses. `Rebuild()` also restores a joint whose
+  connected body was destroyed; collision settings apply immediately.
+- **Contact lookup** — `new Contact(ContactId)` and `World.TryGetContact` resolve contact event IDs
+  to manifold data, with the latter rejecting stale IDs and contacts from another world.
+- **Multi-object Inspector editing** for hybrid bodies, shapes, joints, ropes, water and replayers,
+  including mixed-value handling and applying changes to every selected target.
+
+### Fixed
+- Disabling a shape now removes its collision and updates body mass; re-enabling rebuilds it from
+  the current settings. Initially inactive child shapes no longer allocate native collision.
+- Destroying stale copies of world, body, shape and joint handles is safe, including after their
+  owning world or body has already been destroyed. Duplicate `Box3DWorld` components disable
+  themselves without allocating another native world or replacing the active one.
+- Editor physics and rope previews own their mesh/terrain geometry independently, clean up failed
+  setup, skip disabled shapes and place compound children correctly on scaled bodies.
+- Triangle meshes validate indices, finite vertices, welding and collision bounds before native
+  creation. Native mesh creation also frees temporary allocations on failure; every shipped
+  platform includes the cleanup fix.
+- World-query and character-mover origins use `B3Pos`; `RayHit.Point` and `MoverHit.Point` retain
+  double precision under `BOX3D_DOUBLE`. Added position/offset arithmetic to `B3Pos`.
+
+### Changed
+- Refreshed native plugins with Unity glue version 2 and the mesh cleanup fix. Linux binaries
+  are built on Ubuntu 22.04 for compatibility with older supported systems; Windows builds use
+  reproducible linking. The native-build workflow can commit a complete set of rebuilt binaries.
+- Expanded geometry/streaming, component, contact, query, double-precision and native-build docs,
+  with regression tests for the new APIs and lifetime fixes.
+
+### Compatibility
+- Custom `Box3DShape` subclasses should use `Shape` instead of the former protected `LiveShape`,
+  and `AttachedNativeBody` instead of the former protected `AttachedBody`. The public
+  `AttachedBody` now returns the owning Unity component.
+- Query and mover origins now take `B3Pos`; `float3` and `Vector3` inputs still convert implicitly.
+  Under `BOX3D_DOUBLE`, explicitly cast hit points to `float3` or `Vector3` only when narrowing is
+  intended, and use native plugins with Unity glue version 2 or newer.
+
+
 ## [0.8.2] — 2026-09-03
 
 Feature release: Unity ECS integration and a Burst-callable core, plus per-plane hit details for

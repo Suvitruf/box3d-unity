@@ -28,6 +28,9 @@ Two things must change together, and the package verifies they match:
    | macOS | `Plugins/macOS/libbox3d_d.dylib` |
    | Android arm64 | `Plugins/Android/arm64-v8a/libbox3d_d.so` |
 
+   The `_d` library must carry Unity glue version 2 or newer (any build made with the current
+   `Box3D.Native~` scripts or the `build-natives` workflow); `World.Create` logs a clear error for
+   an older one, because its all-hits ray/shape-cast buffer layout differs in double precision.
    Give each file PluginImporter settings mirroring its single-precision sibling (same platforms,
    CPU x86_64/ARM64). Both variants can ship side by side — a native library only loads when first
    called, so the unused one is inert. iOS and WebGL work differently — see
@@ -68,8 +71,12 @@ mode everything converts implicitly both ways, so code written with the casts co
 under either define.
 
 Where these appear: `Body.Position` / `Body.Transform`, `BodyDef.Position`, `BodyMoveEvent`,
-`RayResult.Point`, `ContactHitEvent.Point`, `ExplosionDef.Position`, apply-force/impulse points,
-and the debug-draw callbacks.
+`RayResult.Point`, `RayHit.Point`, `ContactHitEvent.Point`, `ExplosionDef.Position`, apply-force/impulse
+points, the `origin` of every world query (`CastRay`, `CastRayClosest`, `CastShape`, `OverlapShape`,
+`CollideMover`, `CastMover`), `MoverHit.Point`, and the debug-draw callbacks. Query proxies, mover
+capsules and translations are relative to that origin and stay float. `B3Pos` also offers
+`+`/`-` with a `float3` (offset a position) and `B3Pos - B3Pos` (the float offset between two
+positions, computed at full precision before narrowing).
 
 Behavioral differences in double mode:
 

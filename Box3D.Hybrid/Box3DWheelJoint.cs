@@ -55,16 +55,16 @@ namespace Box3D.Hybrid
         /// code API for state the component doesn't expose.</summary>
         public WheelJoint Native => _wheel;
 
-        /// <summary>Configures the wheel for runtime assembly (before the joint is created in Start):
-        /// connects it to the chassis, sets the axle direction, and enables drive/steering.</summary>
+        /// <summary>Configures the wheel for runtime assembly: connects it to the chassis, sets the
+        /// axle direction, and enables drive/steering. Rebuilds a live joint once.</summary>
         public void Configure(Box3DBody chassis, Vector3 spinAxisLocal, bool drive, bool steerable,
             float maxSpinTorque = 0f)
         {
-            SetConnectedBody(chassis);
             SpinAxis = spinAxisLocal;
             DriveWheel = drive;
             Steerable = steerable;
             if (maxSpinTorque > 0f) MaxSpinTorque = maxSpinTorque;
+            Connected = chassis; // last: its setter rebuilds a live joint with everything above
         }
 
         protected override Joint CreateJoint(BodyId bodyA, BodyId bodyB)

@@ -41,9 +41,9 @@ shapes — validate with `IsValid` before use.
 
 ## Resolving event ids back to wrappers
 
-Events carry raw ids (`BodyId`, `ShapeId`, `JointId`), not wrapper objects. You never need your own
-id→object lookup table — the wrappers are thin value types over the ids, so wrapping an id **is**
-the resolution:
+Events carry raw ids (`BodyId`, `ShapeId`, `JointId`, `ContactId`), not wrapper objects. You never
+need your own id→object lookup table — the wrappers are thin value types over the ids, so wrapping
+an id **is** the resolution:
 
 ```csharp
 foreach (ContactBeginTouchEvent begin in contacts.Begin)
@@ -51,8 +51,15 @@ foreach (ContactBeginTouchEvent begin in contacts.Begin)
     var shape = new Shape(begin.ShapeIdA);   // cheap, no validation
     Body body = shape.GetBody();             // and onward through the normal API
     object payload = MyLookup(body.UserData);
+
+    var contact = new Contact(begin.ContactId);
+    ContactData data = contact.GetData();    // both shapes + manifold(s), see below
 }
 ```
+
+`ContactId` resolves the same way: `new Contact(id)` gives you `IsValid` and `GetData()`. One
+caveat — a contact referenced by a *hit* or *end* event may already be gone, so check `IsValid`
+(or use `TryGetContact`) before reading it.
 
 Ids fresh out of the current world's event stream are safe to wrap directly. For ids you stored
 across steps (or received from elsewhere), use the validated form — false for stale ids and for
@@ -63,8 +70,9 @@ if (world.TryGetBody(savedId, out Body body))
     body.ApplyForceToCenter(force, wake: true);
 ```
 
-`TryGetShape` and `TryGetJoint` work the same way, and every wrapper also exposes `IsValid` for a
-spot check (ids are generation-validated, so a stale id fails cleanly rather than crashing).
+`TryGetShape`, `TryGetJoint` and `TryGetContact` work the same way, and every wrapper also exposes
+`IsValid` for a spot check (ids are generation-validated, so a stale id fails cleanly rather than
+crashing).
 
 ## Body move events
 
