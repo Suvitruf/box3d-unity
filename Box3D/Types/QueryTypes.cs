@@ -33,6 +33,21 @@ namespace Box3D
         public NativeBool Hit;
     }
 
+    /// <summary>Mirrors b3WorldCastOutput. Shape ray casts report a world-space point
+    /// at the precision selected by BOX3D_DOUBLE.</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WorldCastOutput
+    {
+        public float3 Normal;
+        public B3Pos Point;
+        public float Fraction;
+        public int Iterations;
+        public int TriangleIndex;
+        public int ChildIndex;
+        public int MaterialIndex;
+        public NativeBool Hit;
+    }
+
     /// <summary>One hit from an all-hits ray or shape cast (wrapper-defined container, filled by
     /// the query collectors — not a native mirror, but the Burst glue's <c>b3u_RayHit</c> mirrors
     /// THIS layout: 56 bytes in single precision, 64 under <c>BOX3D_DOUBLE</c>). The hit point is a

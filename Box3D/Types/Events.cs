@@ -83,7 +83,7 @@ namespace Box3D
 
     /// <summary>Mirrors native b3BodyEvents (16 bytes).</summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct BodyEventsRaw
+    public struct BodyEventsRaw
     {
         public IntPtr MoveEvents;
         public int MoveCount;
@@ -91,7 +91,7 @@ namespace Box3D
 
     /// <summary>Mirrors native b3ContactEvents (40 bytes).</summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct ContactEventsRaw
+    public struct ContactEventsRaw
     {
         public IntPtr BeginEvents;
         public IntPtr EndEvents;
@@ -103,7 +103,7 @@ namespace Box3D
 
     /// <summary>Mirrors native b3SensorEvents (24 bytes).</summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct SensorEventsRaw
+    public struct SensorEventsRaw
     {
         public IntPtr BeginEvents;
         public IntPtr EndEvents;
@@ -113,7 +113,7 @@ namespace Box3D
 
     /// <summary>Mirrors native b3JointEvents (16 bytes).</summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct JointEventsRaw
+    public struct JointEventsRaw
     {
         public IntPtr JointEvents;
         public int Count;

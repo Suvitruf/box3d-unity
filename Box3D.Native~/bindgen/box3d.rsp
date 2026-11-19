@@ -18,10 +18,12 @@ Box3D
 --methodClassName
 UnsafeBindings
 --with-access-specifier
-*=internal
+*=public
 --libraryPath
 box3d
 --exclude
+B3_HUGE
+b3WorldCastOutput
 b3Vec3_zero
 b3Vec3_one
 b3Vec3_axisX
@@ -88,6 +90,7 @@ b3PlaneResult
 b3CollisionPlane
 b3PlaneSolverResult
 --remap
+b3WorldCastOutput=WorldCastOutput
 b3WorldId=WorldId
 b3BodyId=BodyId
 b3ShapeId=ShapeId

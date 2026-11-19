@@ -1,7 +1,7 @@
 # Queries
 
 All world queries are allocation-free: you pass a buffer (usually `stackalloc`), the query fills
-it and returns the count. Every query takes a `QueryFilter` (from `QueryFilter.Default`) matched
+it and returns the count. Every world query takes a `QueryFilter` (from `QueryFilter.Default`) matched
 against shape filters.
 
 ## Ray casts
@@ -21,7 +21,7 @@ int count = world.CastRay(origin, translation, QueryFilter.Default, hits);
 ```
 
 Note `translation` is the full ray vector (direction × distance), not a normalized direction.
-Every query `origin` is a world position (`B3Pos`) — `float3` and `Vector3` convert to it
+Every world query `origin` is a world position (`B3Pos`) — `float3` and `Vector3` convert to it
 implicitly, and under [`BOX3D_DOUBLE`](double-precision.md) it keeps full double precision.
 
 Using the component layer? `Box3DWorld.TryGetShape(hit.ShapeId, out Box3DShape shape)` and
@@ -98,3 +98,38 @@ proxies crossed — but the tree only knows **boxes, not shapes**, so these are 
 they hand you candidates (by `UserData`); run your own precise test against each. All three fill a
 buffer and return the count (stopping early if it fills), with an `out TreeStats` overload for
 profiling. `QueryClosest` (nearest-proxy refinement) is not yet wrapped.
+
+## Standalone shape queries
+
+`ShapeQueries.RayCast` tests a local-space ray against a sphere without creating a world or body.
+Pass the full displacement in `translation`. The optional `maxFraction` defaults to 1.
+A ray starting inside the sphere hits at its origin with fraction zero and a zero normal.
+
+```csharp
+var sphere = new Sphere { Center = float3.zero, Radius = 1f };
+var origin = new float3(-3f, 0f, 0f);
+var translation = new float3(8f, 0f, 0f);
+if (ShapeQueries.RayCast(sphere, origin, translation, out ShapeRayHit hit))
+    Debug.Log(hit.Point); // (-1, 0, 0), one quarter of the way along the segment
+```
+
+## Raw Box3D API
+
+`Box3D.UnsafeBindings` exposes the generated imports for the bundled native Box3D version.
+Functions keep their C names and reuse package types such as `Sphere` and `WorldId`.
+Raw signatures can change when the package updates Box3D. For calls that take pointers,
+enable **Allow ‘unsafe’ Code** in the calling assembly. With the sphere and ray above:
+
+```csharp
+unsafe
+{
+    var input = new b3RayCastInput { origin = origin, translation = translation, maxFraction = 1f };
+    b3CastOutput result = UnsafeBindings.b3RayCastSphere(&sphere, &input);
+    if (result.hit)
+        Debug.Log(result.point);
+}
+```
+
+Other standalone entry points include `b3OverlapSphere`, `b3ShapeCast`, and `b3ShapeDistance`.
+Follow Box3D's ownership and lifetime rules when passing buffers, retaining callbacks, or reading
+engine-owned pointers. For example, consume event arrays before the next step or world mutation.

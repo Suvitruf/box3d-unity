@@ -10,6 +10,24 @@ namespace Box3D.Tests
     public class QueryTests
     {
         [Test]
+        public void StandaloneSphereRayCast_ReportsLocalHitAndHonorsFractionLimit()
+        {
+            var sphere = new Sphere { Center = new float3(3f, 2f, 0f), Radius = 1f };
+            var origin = new float3(0f, 2f, 0f);
+            var translation = new float3(8f, 0f, 0f);
+
+            Assert.IsTrue(ShapeQueries.RayCast(sphere, origin, translation, out ShapeRayHit hit));
+            Assert.AreEqual(new float3(2f, 2f, 0f), hit.Point);
+            Assert.AreEqual(new float3(-1f, 0f, 0f), hit.Normal);
+            Assert.AreEqual(0.25f, hit.Fraction);
+            Assert.IsFalse(ShapeQueries.RayCast(sphere, origin, translation, out _, 0.2f));
+            Assert.IsTrue(ShapeQueries.RayCast(sphere, sphere.Center, float3.zero, out hit));
+            Assert.AreEqual(sphere.Center, hit.Point);
+            Assert.AreEqual(float3.zero, hit.Normal);
+            Assert.AreEqual(0f, hit.Fraction);
+        }
+
+        [Test]
         public void QueryStructSizes_MatchNativeLayout()
         {
             Assert.AreEqual(32, UnsafeUtility.SizeOf<QueryFilter>());
@@ -21,6 +39,32 @@ namespace Box3D.Tests
             Assert.AreEqual(64, UnsafeUtility.SizeOf<RayResult>());
             Assert.AreEqual(32, UnsafeUtility.SizeOf<ExplosionDef>());
 #endif
+        }
+
+        [Test]
+        public void RawShapeRayCast_PreservesWorldPointPrecision()
+        {
+            World world = World.Create(WorldDef.Default);
+            try
+            {
+                BodyDef bodyDef = BodyDef.Default;
+#if BOX3D_DOUBLE
+                bodyDef.Position = new B3Pos(100000000.25, 0, 0);
+#else
+                bodyDef.Position = new B3Pos(100.25f, 0, 0);
+#endif
+                Body body = world.CreateBody(bodyDef);
+                Shape shape = body.CreateSphereShape(ShapeDef.Default, new Sphere { Radius = 1f });
+                B3Pos origin = bodyDef.Position - new float3(3f, 0f, 0f);
+                WorldCastOutput hit = UnsafeBindings.b3Shape_RayCast(shape.Id, origin, new float3(8f, 0f, 0f));
+                Assert.IsTrue(hit.Hit);
+                Assert.AreEqual(bodyDef.Position.x - 1, hit.Point.x);
+                Assert.AreEqual(0.25f, hit.Fraction);
+            }
+            finally
+            {
+                world.Destroy();
+            }
         }
 
         [Test]

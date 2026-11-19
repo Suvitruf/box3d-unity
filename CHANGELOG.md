@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.4] — 2026-11-19
+
+### Added
+- `Box3D.UnsafeBindings` exposes the generated Box3D C API, including standalone overlap,
+  shape cast and distance queries. Raw signatures follow the native version bundled with the package.
+- `ShapeQueries.RayCast` casts a local-space ray against a sphere without creating a world or
+  enabling unsafe code. It returns the hit point, normal and fraction along the ray.
+
+### Fixed
+- `UnsafeBindings.b3Shape_RayCast` preserves the world-space hit point in double-precision builds.
+
 ## [0.8.3] — 2026-11-14
 
 Compound mesh instances and serialization, component lookup and live joint rebuilding, plus
