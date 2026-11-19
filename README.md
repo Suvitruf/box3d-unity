@@ -170,7 +170,7 @@ ones require the Input System package.
 - [Shapes & geometry](Documentation~/shapes-and-geometry.md)
 - [Joints](Documentation~/joints.md)
 - [Events](Documentation~/events.md)
-- [Queries](Documentation~/queries.md)
+- [Queries](Documentation~/queries.md), including [standalone geometry and raw Box3D bindings](Documentation~/queries.md#standalone-shape-queries)
 - [Character mover](Documentation~/character-mover.md)
 - [Water](Documentation~/water.md) — GPU particle water with a screen-space surface and floating bodies
 - [Callbacks & threading](Documentation~/callbacks-and-threading.md)

@@ -11,10 +11,8 @@ namespace Box3D.Tests
     /// blittable (pinnable) so DllImport marshalling never falls back to conversion.</summary>
     public class BindingsCoverageTests
     {
-        private static Type UnsafeBindingsType => typeof(World).Assembly.GetType("Box3D.UnsafeBindings", throwOnError: true);
-
-        private static MethodInfo[] Externs => UnsafeBindingsType
-            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
+        private static MethodInfo[] Externs => typeof(UnsafeBindings)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(m => m.GetCustomAttribute<DllImportAttribute>() != null)
             .ToArray();
 
@@ -24,6 +22,7 @@ namespace Box3D.Tests
             // 580 native declarations minus 2 duplicate header declarations minus b3InternalAssert
             // (debug-only symbol, absent from Release binaries — WebGL linking requires every extern
             // to exist). Update when box3d is bumped.
+            Assert.IsTrue(typeof(UnsafeBindings).IsPublic);
             Assert.AreEqual(577, Externs.Length);
         }
 
