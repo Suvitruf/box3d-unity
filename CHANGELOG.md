@@ -1,14 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
-### Added
-- Optional runtime collision-layer synchronization through `Box3DWorld.SyncCollisionLayers`
-  (disabled by default). Shape components and rope collision shapes pick up GameObject layer and
-  Unity Layer Collision Matrix changes before each automatic physics step without recreation.
-- `Box3DWorld.SyncCollisionFilters()` refreshes filters before queries or manual stepping when
-  synchronization is enabled.
-
 ## [0.8.4] — 2026-11-19
 
 ### Added
@@ -16,6 +7,11 @@
   shape cast and distance queries. Raw signatures follow the native version bundled with the package.
 - `ShapeQueries.RayCast` casts a local-space ray against a sphere without creating a world or
   enabling unsafe code. It returns the hit point, normal and fraction along the ray.
+- Optional runtime collision-layer synchronization through `Box3DWorld.SyncCollisionLayers`
+  (disabled by default). Shape components and rope collision shapes pick up GameObject layer and
+  Unity Layer Collision Matrix changes before each automatic physics step without recreation.
+- `Box3DWorld.SyncCollisionFilters()` refreshes filters before queries or manual stepping when
+  synchronization is enabled.
 
 ### Fixed
 - `UnsafeBindings.b3Shape_RayCast` preserves the world-space hit point in double-precision builds.
