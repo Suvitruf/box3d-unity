@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Optional runtime collision-layer synchronization through `Box3DWorld.SyncCollisionLayers`
+  (disabled by default). Shape components and rope collision shapes pick up GameObject layer and
+  Unity Layer Collision Matrix changes before each automatic physics step without recreation.
+- `Box3DWorld.SyncCollisionFilters()` refreshes filters before queries or manual stepping when
+  synchronization is enabled.
+
 ## [0.8.4] — 2026-11-19
 
 ### Added

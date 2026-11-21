@@ -29,6 +29,8 @@ namespace Box3D.Hybrid
         private Vector3 Center = Vector3.zero;
 
         private Shape _shape;
+        private WorldId _collisionWorldId;
+        private CollisionLayerState _collisionLayerState;
         private Body _attachedBody; // the body this shape was created on (rebuilds recreate on it)
         private Body _ownBody; // only set when this shape has no Box3DBody and creates a static one
         private Box3DBody _owner; // the component whose body this is attached to (null for an orphan)
@@ -175,6 +177,18 @@ namespace Box3D.Hybrid
             return mask;
         }
 
+        internal static void SyncCollisionFilters(WorldId worldId, ulong[] layerMasks, bool force)
+        {
+            foreach (Box3DShape component in Registry.Values)
+            {
+                if (!component || !component._collisionWorldId.Equals(worldId)) continue;
+                if (component._collisionLayerState.Refresh(layerMasks, force))
+                {
+                    component._collisionLayerState.Apply(component._shape);
+                }
+            }
+        }
+
         /// <summary>Creates the native shape on the given body. <paramref name="localPosition"/> and
         /// <paramref name="localRotation"/> place the shape relative to the body's frame (identity
         /// for a shape on the body's own GameObject); <paramref name="scale"/> is the shape
@@ -193,6 +207,8 @@ namespace Box3D.Hybrid
             _shape = CreateShape(body, localPosition, localRotation, scale);
             if (!_shape.IsValid) return;
             Registry[_shape.Id] = this;
+            _collisionWorldId = body.GetWorld();
+            _collisionLayerState = new CollisionLayerState(gameObject);
 
             // The owning Box3DBody's GCHandle rides in shape userData, so a contact event maps its
             // ShapeId straight back to the component — the shape-level twin of the body-move channel.
@@ -240,6 +256,7 @@ namespace Box3D.Hybrid
             _shape.Destroy(updateBodyMass: true); // re-derives mass over remaining + rebuilt shapes
             ReleaseRebuiltGeometry();
             _shape = rebuilt;
+            _collisionLayerState = new CollisionLayerState(gameObject);
             Registry[_shape.Id] = this;
             if (userData != IntPtr.Zero) _shape.UserData = userData;
             if (hitEvents) _shape.EnableHitEvents(true);
