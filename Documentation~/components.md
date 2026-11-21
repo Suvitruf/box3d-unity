@@ -57,6 +57,8 @@ Optional — placed automatically the first time a body needs it. Add one explic
 - **Gravity** — the world gravity vector.
 - **Sub Step Count** — solver sub-steps per step (higher = stiffer joints/stacks, slower).
 - **Worker Count** — physics threads; 0 = auto (about half the logical cores).
+- **Sync Collision Layers** — off by default. Enable to synchronize GameObject layers and Unity's
+  Layer Collision Matrix before each Box3D step (see [Collision layers](#collision-layers)).
 
 Only the first world is used. A second `Box3DWorld` logs a warning and disables itself without
 allocating a native world; bodies loaded later continue to use the first world. Selecting the world draws a purple
@@ -130,8 +132,48 @@ automatic when the component lives on the Terrain GameObject.
 Shapes honor the GameObject's **Layer** and Unity's **Layer Collision Matrix**
 (Project Settings → Physics): a shape's collision category is its layer, and it collides with the
 layers that layer is allowed to in the matrix. Set the layer as you would for a normal Unity
-collider. (The layer is read when the shape is created; changing it at runtime needs the body
-recreated.)
+collider.
+
+The layer and matrix are read when each shape is created. **Runtime synchronization is disabled
+by default.** To enable it in the Inspector, select the GameObject with the `Box3DWorld` component
+and check **Sync Collision Layers**. If the world is created automatically, add a `Box3DWorld`
+component to a scene GameObject to configure it before Play mode, or enable it from a script:
+
+```csharp
+Box3D.Hybrid.Box3DWorld.Instance.SyncCollisionLayers = true;
+```
+
+Synchronization starts before the next automatic Box3D physics step. To stop it, uncheck the
+Inspector flag or set it to `false`:
+
+```csharp
+Box3D.Hybrid.Box3DWorld.Instance.SyncCollisionLayers = false;
+```
+
+While enabled, the world checks layers and the matrix before each automatic physics step and
+updates changed filters in place, preserving bodies, shapes, and collision group indices. This
+covers shape components (including compound children and shapes without a body component) and
+both dynamic and baked rope collision shapes. Shapes created directly through the code API keep
+their own filters. Enabling synchronization applies the current Unity settings to existing
+component shapes; subsequent updates follow changes to their Unity layer or matrix mask.
+
+For a query or manual simulation step that needs the new filters immediately, call
+`Box3DWorld.Instance.SyncCollisionFilters()` first. This method also works while the world is
+paused, but only when **Sync Collision Layers** is enabled. Synchronization checks the 528 unique
+layer pairs once per pass and each registered shape/rope's layer, with no scene searches. Turning
+the flag off stops polling and automatic filter updates; existing filters retain their last values.
+Leave it off when managing custom category/mask filters yourself.
+
+With synchronization disabled, apply runtime changes explicitly. You can either:
+
+- Disable and re-enable each affected `Box3DShape` component to recreate its native shape using
+  the current layer and matrix settings.
+- Update a live shape's filter through `box3DShape.Shape.GetFilter()` and
+  `box3DShape.Shape.SetFilter(filter)`, setting `CategoryBits` and `MaskBits` for the desired
+  layer and allowed collisions. This updates filtering without recreating the shape or body.
+
+When updating filters manually, matrix changes require refreshing all affected shapes on both
+sides of the changed layer pair. Toggling only `Box3DBody.enabled` does not refresh shape filters.
 
 ## Compound shapes & static colliders
 

@@ -24,6 +24,10 @@ namespace Box3D.Hybrid
         [SerializeField, Min(0), Tooltip("Box3D worker threads. 0 = auto (about half the logical cores).")]
         private int WorkerCount = 0;
 
+        [Tooltip("Opt in to syncing GameObject layers and Unity's layer collision matrix before each Box3D step. " +
+            "Off by default: no runtime layer/matrix polling. Applies to shape components and ropes.")]
+        public bool SyncCollisionLayers;
+
         [SerializeField, Tooltip("Overlay physics debug geometry in the Scene view each frame (None = off). " +
             "Enable Contacts / Islands / Forces / Bounds to see the solver's view of the world. " +
             "For the Game view, turn on its Gizmos toggle.")]
@@ -42,6 +46,8 @@ namespace Box3D.Hybrid
         private Body _anchor;
         private static Box3DWorld _instance;
         private bool _isDuplicate;
+        private ulong[] _collisionLayerMasks;
+        private bool _hasSyncedCollisionLayers;
 
         /// <summary>The underlying Box3D world (valid after this component is enabled).</summary>
         public World World => _world;
@@ -136,9 +142,44 @@ namespace Box3D.Hybrid
             _kinematicBodies.Remove(body);
         }
 
+        /// <summary>Refreshes component and rope collision filters from Unity's layers and matrix.
+        /// Does nothing unless <see cref="SyncCollisionLayers"/> is enabled. Called before each
+        /// automatic step; call explicitly before queries or manual stepping when an immediate
+        /// refresh is needed, including while paused. Call on the main thread outside a step.</summary>
+        public void SyncCollisionFilters()
+        {
+            if (!SyncCollisionLayers)
+            {
+                _hasSyncedCollisionLayers = false;
+                return;
+            }
+            if (_isDuplicate || !_world.IsValid) return;
+
+            if (_collisionLayerMasks == null) _collisionLayerMasks = new ulong[32];
+            Array.Clear(_collisionLayerMasks, 0, _collisionLayerMasks.Length);
+            // The matrix is symmetric: 528 native reads shared by all shapes, including its diagonal.
+            for (int layer = 0; layer < 32; layer++)
+            {
+                for (int other = layer; other < 32; other++)
+                {
+                    if (Physics.GetIgnoreLayerCollision(layer, other)) continue;
+                    _collisionLayerMasks[layer] |= 1UL << other;
+                    _collisionLayerMasks[other] |= 1UL << layer;
+                }
+            }
+
+            bool force = !_hasSyncedCollisionLayers;
+            Box3DShape.SyncCollisionFilters(_world.Id, _collisionLayerMasks, force);
+            Box3DRope.SyncCollisionFilters(this, _collisionLayerMasks, force);
+            _hasSyncedCollisionLayers = true;
+        }
+
         private void FixedUpdate()
         {
+            if (!SyncCollisionLayers) _hasSyncedCollisionLayers = false;
             if (Paused || !_world.IsValid) return;
+
+            if (SyncCollisionLayers) SyncCollisionFilters();
 
             float deltaTime = Time.fixedDeltaTime;
             for (int i = 0; i < _kinematicBodies.Count; i++)

@@ -67,6 +67,9 @@ namespace Box3D.Hybrid
 
         private Box3DWorld _world;
         private Body[] _segments;
+        private Shape[] _collisionShapes;
+        private CollisionLayerState _collisionLayerState;
+        private static readonly List<Box3DRope> Registry = new List<Box3DRope>();
         private Joint[] _joints;
         private Body _startPin;    // static pin bodies, created only for unattached ends
         private Body _endPin;
@@ -103,6 +106,24 @@ namespace Box3D.Hybrid
             // Start (not Awake) so every Box3DBody the ends may attach to already exists.
             if (Mode == RopeMode.Baked) BuildBaked();
             else BuildDynamic();
+            if (_collisionShapes != null)
+            {
+                _collisionLayerState = new CollisionLayerState(gameObject);
+                Registry.Add(this);
+            }
+        }
+
+        internal static void SyncCollisionFilters(Box3DWorld world, ulong[] layerMasks, bool force)
+        {
+            foreach (Box3DRope rope in Registry)
+            {
+                if (!rope || rope._world != world) continue;
+                if (!rope._collisionLayerState.Refresh(layerMasks, force)) continue;
+                foreach (Shape shape in rope._collisionShapes)
+                {
+                    rope._collisionLayerState.Apply(shape);
+                }
+            }
         }
 
         private void BuildBaked()
@@ -114,9 +135,10 @@ namespace Box3D.Hybrid
             _world = Box3DWorld.Instance;
             _bakedBody = _world.World.CreateBody(BodyDef.Default); // static, identity — capsules in world coords
             ShapeDef def = SegmentShapeDef();
+            _collisionShapes = new Shape[points.Length - 1];
             for (int i = 0; i < points.Length - 1; i++)
             {
-                _bakedBody.CreateCapsuleShape(def, new Capsule
+                _collisionShapes[i] = _bakedBody.CreateCapsuleShape(def, new Capsule
                 {
                     Center1 = points[i],
                     Center2 = points[i + 1],
@@ -143,6 +165,7 @@ namespace Box3D.Hybrid
             _halfSegment = restLength * 0.5f;
 
             _segments = new Body[Segments];
+            _collisionShapes = new Shape[Segments];
             for (int i = 0; i < Segments; i++)
             {
                 float3 a = nodes[i];
@@ -162,7 +185,7 @@ namespace Box3D.Hybrid
 
                 ShapeDef shapeDef = SegmentShapeDef();
                 float cap = Mathf.Max(0.001f, _halfSegment - Radius);
-                _segments[i].CreateCapsuleShape(shapeDef, new Capsule
+                _collisionShapes[i] = _segments[i].CreateCapsuleShape(shapeDef, new Capsule
                 {
                     Center1 = new float3(0f, 0f, -cap),
                     Center2 = new float3(0f, 0f, cap),
@@ -279,6 +302,7 @@ namespace Box3D.Hybrid
 
         private void OnDestroy()
         {
+            Registry.Remove(this);
             if (_joints != null)
             {
                 foreach (Joint joint in _joints)
